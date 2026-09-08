@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Yield — State Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0c11; --card:#0f131a; --card-2:#12161f;
+    --line:rgba(255,255,255,.08); --line-2:rgba(255,255,255,.13);
+    --text:#e8e9ee; --dim:#9aa0ad; --faint:#5f6673; --ghost:#39404c;
+    --accent:#e8935c;         /* warm, used only as a marker */
+    --safe:#6fae86;           /* preserved / no data loss */
+    --cue:#c9a15e;            /* subtle cue, non-blocking */
+    --agent:#7fa0c8;          /* agent timeline */
+    --mono:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);line-height:1.6;
+    -webkit-font-smoothing:antialiased;padding:48px 24px 80px}
+  .wrap{max-width:1000px;margin:0 auto}
+  .eyebrow{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--faint)}
+  h1{font-size:30px;font-weight:600;letter-spacing:.04em;margin:8px 0 4px}
+  h1 .tick{color:var(--accent)}
+  .sub{color:var(--dim);font-size:13px;max-width:640px}
+  h2{font-size:12px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+    margin:52px 0 6px;display:flex;align-items:center;gap:12px}
+  h2::after{content:"";flex:1;height:1px;background:var(--line)}
+  h2 .n{color:var(--ghost);font-weight:400}
+  .note{font-size:12.5px;color:var(--dim);margin:10px 0 18px;max-width:720px}
+
+  .principle{margin-top:28px;border:1px solid var(--line-2);border-radius:14px;
+    background:linear-gradient(160deg,rgba(232,147,92,.06),rgba(255,255,255,.01));padding:20px 22px}
+  .principle .k{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  .principle p{font-size:14px;color:var(--text);line-height:1.65}
+  .principle b{color:#fff}
+
+  /* two timelines */
+  .lanes{margin-top:20px;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden}
+  .lane{display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
+  .lane:last-child{border-bottom:none}
+  .lane .who{width:120px;flex:none;padding:18px 16px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    border-right:1px solid var(--line);display:flex;align-items:center}
+  .lane.agent .who{color:var(--agent)} .lane.user .who{color:var(--accent)}
+  .track{flex:1;display:flex;align-items:center;gap:8px;padding:16px;flex-wrap:wrap}
+  .st{border:1px solid var(--line-2);border-radius:8px;padding:7px 12px;font-size:11.5px;color:var(--text);
+    background:var(--card-2);white-space:nowrap}
+  .st.rest{color:var(--faint)}
+  .arrow{color:var(--ghost);font-size:12px}
+  .trig{font-size:9.5px;color:var(--faint);letter-spacing:.04em;border:1px dashed var(--ghost);border-radius:5px;padding:3px 7px}
+  .trig.hook{color:var(--agent);border-color:rgba(127,160,200,.35)}
+
+  /* generic tables */
+  table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12.5px}
+  th{text-align:left;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+    font-weight:500;padding:10px 12px;border-bottom:1px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--dim);vertical-align:top}
+  td b{color:var(--text);font-weight:500}
+  td .code{color:var(--agent);font-size:11.5px}
+  tr:last-child td{border-bottom:none}
+  .state-name{color:var(--text);font-weight:500;white-space:nowrap}
+
+  /* collision matrix */
+  .matrix{overflow-x:auto;border:1px solid var(--line);border-radius:14px;background:var(--card);margin-top:6px}
+  .matrix table{margin:0}
+  .matrix th:first-child,.matrix td:first-child{position:sticky;left:0;background:var(--card);z-index:1;
+    border-right:1px solid var(--line-2)}
+  .matrix th{background:var(--card-2)}
+  .matrix td{border-right:1px solid var(--line)}
+  .matrix td:last-child{border-right:none}
+  .cell{display:block}
+  .tag{display:inline-block;font-size:9px;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:4px;margin-bottom:5px}
+  .tag.safe{color:var(--safe);background:rgba(111,174,134,.1);border:1px solid rgba(111,174,134,.25)}
+  .tag.cue{color:var(--cue);background:rgba(201,161,94,.1);border:1px solid rgba(201,161,94,.25)}
+  .tag.alive{color:var(--agent);background:rgba(127,160,200,.1);border:1px solid rgba(127,160,200,.25)}
+  .cell small{color:var(--dim);font-size:11.5px;line-height:1.5;display:block}
+
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:14px 0 0;font-size:11px;color:var(--faint)}
+  .legend span{display:flex;align-items:center;gap:7px}
+  .sw{width:10px;height:10px;border-radius:3px}
+  .sw.safe{background:var(--safe)}.sw.cue{background:var(--cue)}.sw.alive{background:var(--agent)}
+
+  .rule{border-left:2px solid var(--accent);padding:2px 0 2px 16px;margin:14px 0;color:var(--dim);font-size:12.5px}
+  .rule b{color:var(--text)}
+
+  .foot{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);font-size:11px;color:var(--ghost);letter-spacing:.04em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Yield · behaviour spec</div>
+  <h1>State Model<span class="tick">.</span></h1>
+  <p class="sub">Every state the panel can be in, every transition, and — the part that matters — what happens when the agent's timeline and the user's timeline collide. Built to have no loose ends before any of it gets skinned.</p>
+
+  <div class="principle">
+    <div class="k">Core principle</div>
+    <p>The user's input timeline is <b>independent</b> of the agent's timeline. A person can add context <b>any time</b> — idle, mid-task, between tasks. The agent starting or finishing <b>never interrupts, discards, or rushes</b> what the user is doing. Agent state changes only the <b>ambient feel</b> of the panel; it never gates the ability to contribute. Everything the user saves lands in <span style="color:var(--text)">context.md</span> regardless of what the agent is doing.</p>
+  </div>
+
+  <!-- ===================== TWO TIMELINES ===================== -->
+  <h2><span class="n">01</span> The two timelines</h2>
+  <p class="note">Two independent clocks. The agent's is driven entirely by Claude Code hooks. The user's is driven entirely by the person. They run in parallel and occasionally cross — those crossings are Section 04.</p>
+
+  <div class="lanes">
+    <div class="lane agent">
+      <div class="who">Agent · Claude</div>
+      <div class="track">
+        <span class="st rest">IDLE</span>
+        <span class="trig hook">UserPromptSubmit ⏎</span>
+        <span class="arrow">→</span>
+        <span class="st">WORKING</span>
+        <span class="trig hook">Stop ⏎</span>
+        <span class="arrow">→</span>
+        <span class="st rest">IDLE</span>
+      </div>
+    </div>
+    <div class="lane user">
+      <div class="who">You · input</div>
+      <div class="track">
+        <span class="st rest">DORMANT</span>
+        <span class="arrow">→</span>
+        <span class="st">COMPOSING</span>
+        <span class="arrow">→</span>
+        <span class="st">SAVING</span>
+        <span class="arrow">→</span>
+        <span class="st">SAVED</span>
+        <span class="arrow">→</span>
+        <span class="st rest">DORMANT</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== AGENT STATES ===================== -->
+  <h2><span class="n">02</span> Agent states</h2>
+  <table>
+    <tr><th>State</th><th>Meaning</th><th>Enters on</th><th>Ambient display</th></tr>
+    <tr>
+      <td class="state-name">IDLE</td>
+      <td>No task running. Claude is done or hasn't started.</td>
+      <td><span class="code">Stop</span> hook / first open</td>
+      <td>Resting — calm, quiet, invites context for next time.</td>
+    </tr>
+    <tr>
+      <td class="state-name">WORKING</td>
+      <td>A task is running. The prime window to capture context.</td>
+      <td><span class="code">UserPromptSubmit</span> hook</td>
+      <td>Alive — the panel signals activity.</td>
+    </tr>
+    <tr>
+      <td class="state-name">working · long</td>
+      <td>Same task, running past ~30s. Avoids fatigue from a permanently loud panel.</td>
+      <td>timer while WORKING</td>
+      <td>Settles to a calmer "still working" after the initial liveliness.</td>
+    </tr>
+    <tr>
+      <td class="state-name">just-finished</td>
+      <td>Transition moment, not a resting state. Acknowledges the work completed.</td>
+      <td><span class="code">Stop</span> hook</td>
+      <td>Brief acknowledge, then settles to resting.</td>
+    </tr>
+  </table>
+
+  <!-- ===================== USER STATES ===================== -->
+  <h2><span class="n">03</span> User input states</h2>
+  <p class="note">The panel is always in one input <b>mode</b> — Text or Voice — and the user moves through these states within it. Voice adds two states that text doesn't have (transcribing, reviewing) because speech-to-text has real latency.</p>
+  <table>
+    <tr><th>State</th><th>Mode</th><th>What's happening</th><th>Leaves on</th></tr>
+    <tr><td class="state-name">DORMANT</td><td>either</td><td>Panel present, user not interacting. The default. Must be calm and ignorable.</td><td>user focuses input / hits mic</td></tr>
+    <tr><td class="state-name">COMPOSING · text</td><td>text</td><td>Actively typing a note.</td><td>Enter → SAVING · Esc → discard draft</td></tr>
+    <tr><td class="state-name">COMPOSING · voice</td><td>voice</td><td>Recording. Mic is the main affordance, not an icon.</td><td>stop recording → TRANSCRIBING</td></tr>
+    <tr><td class="state-name">TRANSCRIBING</td><td>voice</td><td>Speech captured, being turned into text. Has real lag — a genuine state, not instant.</td><td>transcript returns → REVIEWING</td></tr>
+    <tr><td class="state-name">REVIEWING</td><td>voice</td><td>Transcribed text shown, editable before commit.</td><td>confirm → SAVING · edit → COMPOSING</td></tr>
+    <tr><td class="state-name">SAVING</td><td>either</td><td>Write to context.md in flight.</td><td>write ok → SAVED · write fails → ERROR</td></tr>
+    <tr><td class="state-name">SAVED</td><td>either</td><td>Transient confirmation. The payoff beat.</td><td>~1.5s → DORMANT</td></tr>
+  </table>
+
+  <!-- ===================== COLLISION MATRIX ===================== -->
+  <h2><span class="n">04</span> Collision matrix</h2>
+  <p class="note">The heart of the model. Rows are what the <b>user</b> is doing; columns are the <b>agent event</b> that arrives mid-flight. Every cell is resolved by the core principle: <b>never destroy, never rush, never force a decision.</b></p>
+
+  <div class="legend">
+    <span><span class="sw safe"></span>draft/work preserved — no data loss</span>
+    <span><span class="sw cue"></span>optional non-blocking cue</span>
+    <span><span class="sw alive"></span>ambient feel changes only</span>
+  </div>
+
+  <div class="matrix" style="margin-top:14px">
+    <table>
+      <tr>
+        <th>User is…</th>
+        <th>TASK STARTS (UserPromptSubmit)</th>
+        <th>TASK ENDS (Stop)</th>
+      </tr>
+      <tr>
+        <td class="state-name">DORMANT</td>
+        <td><span class="cell"><span class="tag alive">alive</span><small>Panel comes alive, shows the ask. This is the invitation to contribute.</small></span></td>
+        <td><span class="cell"><span class="tag alive">alive</span><small>Brief acknowledge, then settles to resting. If nothing was added — no nag, just quiet.</small></span></td>
+      </tr>
+      <tr>
+        <td class="state-name">COMPOSING · text</td>
+        <td><span class="cell"><span class="tag safe">preserved</span><small>Draft untouched. Ambient goes alive around it. Keep typing.</small></span></td>
+        <td><span class="cell"><span class="tag safe">preserved</span><span class="tag cue">cue</span><small>Draft untouched. A quiet "task finished" cue may appear, but never steals focus or the draft. The note simply targets the <b>next</b> run now.</small></span></td>
+      </tr>
+      <tr>
+        <td class="state-name">COMPOSING · voice</td>
+        <td><span class="cell"><span class="tag safe">preserved</span><small>Recording continues uninterrupted. Ambient goes alive.</small></span></td>
+        <td><span class="cell"><span class="tag safe">preserved</span><small>Recording continues. It <b>always</b> completes its lifecycle — record, transcribe, save — regardless of agent state. You can't cut someone off mid-sentence.</small></span></td>
+      </tr>
+      <tr>
+        <td class="state-name">TRANSCRIBING</td>
+        <td><span class="cell"><span class="tag safe">preserved</span><small>Continues. Ambient alive.</small></span></td>
+        <td><span class="cell"><span class="tag safe">preserved</span><small>Continues. Save proceeds when the transcript is ready.</small></span></td>
+      </tr>
+      <tr>
+        <td class="state-name">REVIEWING</td>
+        <td><span class="cell"><span class="tag safe">preserved</span><small>Draft untouched. Ambient alive.</small></span></td>
+        <td><span class="cell"><span class="tag safe">preserved</span><span class="tag cue">cue</span><small>Draft untouched. Save targets the next run. Optional quiet cue.</small></span></td>
+      </tr>
+      <tr>
+        <td class="state-name">SAVING</td>
+        <td><span class="cell"><span class="tag safe">preserved</span><small>Save completes normally; the new task's context is available for the run after.</small></span></td>
+        <td><span class="cell"><span class="tag safe">preserved</span><small>Save completes. Ordering guarantees the write is never lost to a near-simultaneous Stop.</small></span></td>
+      </tr>
+      <tr>
+        <td class="state-name">SAVED (transient)</td>
+        <td><span class="cell"><span class="tag alive">alive</span><small>New task begins; panel re-alives cleanly after the confirmation.</small></span></td>
+        <td><span class="cell"><span class="tag alive">alive</span><small>Settles to resting.</small></span></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ===================== NOTE ATTACHMENT ===================== -->
+  <h2><span class="n">05</span> Which task does a note attach to?</h2>
+  <p class="note">Every note is paired with a "task" for legibility in context.md. Because the timelines are independent, we need one clear rule for the pairing — otherwise a note written across a task boundary is ambiguous.</p>
+  <div class="rule"><b>Rule:</b> a note is tagged with the task that was active <b>when the user started composing</b> — because that's the context they were reacting to. If nothing was running when they started, it's tagged <b>general</b> and attaches to the next task (or saves as standing context if none comes). The tag is set at compose-start, not at save-time, so a task ending mid-compose doesn't re-point the note.</div>
+  <p class="note" style="margin-top:0">This is a decision, not a law of physics — it's the "you're reacting to what you saw" model. Flagged here so it's explicit and reversible, not silently baked in.</p>
+
+  <!-- ===================== EDGE CASES ===================== -->
+  <h2><span class="n">06</span> Edge cases &amp; empties</h2>
+  <p class="note">Rare, but real. Each has a rule so nothing silently breaks or nags.</p>
+  <table>
+    <tr><th>Case</th><th>Rule</th></tr>
+    <tr><td class="state-name">Very short task (&lt;~400ms)</td><td>Debounce the "alive" transition. If Stop arrives before the debounce, skip the alive animation entirely — no jarring flash for a 2-second task.</td></tr>
+    <tr><td class="state-name">Very long task (&gt;~30s)</td><td>Settle the ambient from lively to a calm "still working" so a long run doesn't fatigue the eye.</td></tr>
+    <tr><td class="state-name">Rapid successive tasks</td><td>Re-trigger "alive" cleanly on each UserPromptSubmit; never stack or double-animate.</td></tr>
+    <tr><td class="state-name">Empty save attempt</td><td>Enter with an empty field is a no-op. Nothing written, no error.</td></tr>
+    <tr><td class="state-name">First run ever</td><td>Onboarding state — a one-time "here's what Yield is / what to do." <b>Deferred to its own phase</b>, but the slot exists in the model.</td></tr>
+    <tr><td class="state-name">No history yet</td><td>The recent-note line shows a gentle empty state — an invitation, not a blank: "Nothing yet — add something for next time."</td></tr>
+    <tr><td class="state-name">Listener down</td><td>Panel shows a quiet, non-blocking status: it can't hear the agent right now. Input still works and still saves to context.md.</td></tr>
+    <tr><td class="state-name">Transcription fails</td><td>Keep the audio/last text, show an inline retry. Never lose what was spoken. Error explains what happened, in the interface's voice.</td></tr>
+    <tr><td class="state-name">Write to context.md fails</td><td>Hold the draft in the panel, surface an inline error with a retry. The note is never silently dropped.</td></tr>
+  </table>
+
+  <!-- ===================== TRANSITIONS ===================== -->
+  <h2><span class="n">07</span> Transition reference</h2>
+  <p class="note">Every edge in the machine, with its trigger. Hook-driven transitions are marked.</p>
+  <table>
+    <tr><th>From → To</th><th>Trigger</th></tr>
+    <tr><td><b>IDLE → WORKING</b></td><td><span class="code">UserPromptSubmit</span> hook fires</td></tr>
+    <tr><td><b>WORKING → IDLE</b></td><td><span class="code">Stop</span> hook fires</td></tr>
+    <tr><td><b>DORMANT → COMPOSING·text</b></td><td>user focuses the field / starts typing</td></tr>
+    <tr><td><b>DORMANT → COMPOSING·voice</b></td><td>user taps mic (mode = voice)</td></tr>
+    <tr><td><b>mode: text → voice</b></td><td>user toggles input mode</td></tr>
+    <tr><td><b>COMPOSING·voice → TRANSCRIBING</b></td><td>user stops recording</td></tr>
+    <tr><td><b>TRANSCRIBING → REVIEWING</b></td><td>transcript returns</td></tr>
+    <tr><td><b>REVIEWING → COMPOSING</b></td><td>user edits the transcript</td></tr>
+    <tr><td><b>COMPOSING / REVIEWING → SAVING</b></td><td>Enter / confirm (non-empty)</td></tr>
+    <tr><td><b>SAVING → SAVED</b></td><td>write to context.md succeeds</td></tr>
+    <tr><td><b>SAVING → ERROR</b></td><td>write fails</td></tr>
+    <tr><td><b>SAVED → DORMANT</b></td><td>~1.5s auto-settle</td></tr>
+    <tr><td><b>COMPOSING → DORMANT</b></td><td>Esc / blur with empty field (draft kept if non-empty)</td></tr>
+  </table>
+
+  <!-- ===================== WHAT DRIVES WHAT ===================== -->
+  <h2><span class="n">08</span> What drives what</h2>
+  <p class="note">The one separation that keeps the whole model clean:</p>
+  <div class="rule"><b>Agent state</b> drives only the <b>ambient display</b> — whether the panel feels resting or alive. It has zero authority over input.</div>
+  <div class="rule"><b>User state</b> drives the <b>input flow</b> — composing, saving, confirming. It runs on its own clock and is never preempted by the agent.</div>
+  <p class="note" style="margin-top:0">Because these two never gate each other, every collision in Section 04 resolves the same way: the agent changes the mood, the user keeps control. No loose ends.</p>
+
+  <div class="foot">Yield — state model · v1 · reference for build. Decisions marked "flagged" are reversible; edges marked "deferred" have a reserved slot, not an omission.</div>
+</div>
+</body>
+</html>

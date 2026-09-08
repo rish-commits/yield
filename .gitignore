@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build output (reproduce with: npm run compile)
+out/
+
+# Packaged extensions
+*.vsix
+
+# macOS
+.DS_Store
+
+# Secrets and credentials. Listed whether or not they exist today, so one
+# cannot be committed by accident later.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+id_rsa
+id_rsa.*
+*.cer
+*.crt
+secrets.json
+.npmrc
+.vsce
+*.pat
+
+# Yield's own notes from developing Yield. This repo IS Yield, so the notes
+# here are development scratch rather than project context. Remove this to
+# publish them.
+.yield/
+
+# Machine-specific: the hook port is derived from this checkout's absolute
+# path, and the permission entries point at this home directory.
+.claude/
+
+# Compiled whisper runtime (arm64 macOS only, ~3.7 MB, rebuilt by
+# scripts/stage-whisper.js). Excluded from the VSIX too.
+bin/whisper/
+
+# Local verification suites and fixtures. They drive the compiled build with
+# absolute paths from this machine, so they are development-only.
+scratchpad/

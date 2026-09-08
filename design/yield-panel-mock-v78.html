@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Yield — v78 · voice states</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s8:32px;--s10:40px;
+    --t-xs:11px;--t-sm:12px;--t-base:12.5px;--t-md:13.5px;--t-lg:19px;
+    --bg:#f4f4f5;--card:#fff;--muted:#f4f4f5;--muted-2:#e4e4e7;
+    --border:rgba(0,0,0,.08);--border-2:rgba(0,0,0,.13);
+    --fg:#18181b;--mfg:#52525b;--mfg-2:#a1a1aa;--ring:rgba(0,0,0,.22);--green:#22c55e;
+    --sans:'Geist','Geist Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --mono:'Geist Mono',ui-monospace,monospace;
+    --geist:'Geist','Geist Sans',-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);font-family:var(--sans);color:var(--fg);display:flex;align-items:center;justify-content:center;padding:var(--s6);-webkit-font-smoothing:antialiased}
+  .card{width:min(400px,94vw);background:var(--card);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 30px -12px rgba(0,0,0,.12)}
+
+  .cardtop{display:flex;align-items:center;gap:var(--s1);height:48px;padding:0 var(--s3)}
+  .iconbtn{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--mfg-2);cursor:pointer;transition:.15s;background:none;border:none}
+  .iconbtn:hover{background:var(--muted);color:var(--mfg)} .iconbtn svg{width:16px;height:16px}
+  .statuschip{display:flex;align-items:center;gap:var(--s2);font-size:var(--t-sm);line-height:1.3;color:var(--mfg);padding:var(--s1) var(--s3) var(--s1) var(--s2);border-radius:999px;cursor:pointer;margin-right:auto;transition:.15s}
+  .statuschip:hover{background:var(--muted)}
+  .sdot{width:7px;height:7px;border-radius:50%;background:#d4d4d8;transition:.3s;flex:none}
+  .card.working .sdot{background:var(--green);box-shadow:0 0 8px rgba(34,197,94,.45)}
+
+  .centre{display:flex;flex-direction:column;align-items:center;text-align:center;padding:var(--s2) var(--s6) 0}
+  .markwrap{position:relative;width:52px;height:52px;border-radius:13px;overflow:hidden;box-shadow:0 4px 14px rgba(10,13,18,.28)}
+  .markwrap .mark{width:52px;height:52px;border-radius:13px;display:block}
+  .markwrap::after{content:"";position:absolute;top:-60%;left:-30%;width:40%;height:220%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);transform:rotate(18deg);pointer-events:none;animation:marksheen 6s ease-in-out infinite}
+  @keyframes marksheen{0%{left:-40%}22%{left:130%}100%{left:130%}}
+  .greet{margin-top:var(--s4)}
+  .greet .h1{font-family:var(--geist);font-size:var(--t-lg);font-weight:600;line-height:1.25;color:var(--fg);letter-spacing:-.02em}
+  .ydplain{font-weight:inherit}
+  .greet .h2{font-family:var(--geist);font-size:var(--t-md);font-weight:500;line-height:1.3;letter-spacing:-.01em;color:var(--mfg);margin-top:var(--s1)}
+  .greet p{font-family:var(--mono);font-size:11.5px;line-height:1.55;color:var(--mfg);margin-top:var(--s3);max-width:310px;letter-spacing:-.01em}
+  .greet p .m{font-family:var(--mono);font-size:var(--t-sm);color:var(--fg);background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.045);border-radius:5px;padding:1px 6px;white-space:nowrap}
+  .card.returning .greet p{display:none}
+
+  .chat{margin-top:var(--s4);display:flex;flex-direction:column}
+
+  /* composer (v77, unchanged) */
+  .composer{margin:var(--s4) var(--s6) 0;position:relative;background:var(--card);border:1px solid var(--border);border-radius:13px;transition:border-color .22s cubic-bezier(.16,1,.3,1),background-color .22s cubic-bezier(.16,1,.3,1),box-shadow .15s;overflow:hidden}
+  .composer:focus-within{border-color:var(--ring);box-shadow:0 0 0 3px rgba(0,0,0,.05)}
+  .composer textarea{display:block;width:100%;min-height:64px;max-height:120px;resize:none;background:transparent;border:none;outline:none;padding:12px 76px 12px 14px;font-family:var(--geist);font-size:var(--t-base);color:var(--fg);line-height:1.5;transition:opacity .18s}
+  .composer textarea::placeholder{color:var(--mfg-2);line-height:1.5}
+  .cbtns{position:absolute;right:7px;top:6px;display:flex;align-items:center;gap:4px;transition:opacity .18s}
+  .micbtn{width:32px;height:32px;border-radius:8px;border:none;background:none;display:flex;align-items:center;justify-content:center;color:var(--mfg-2);cursor:pointer;transition:.15s}
+  .micbtn:hover{color:var(--fg);background:var(--muted)} .micbtn svg{width:16px;height:16px}
+  .sendbtn{width:32px;height:32px;border-radius:8px;border:none;background:#27272a;color:#fafafa;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
+  .sendbtn:hover{background:#3f3f46} .sendbtn svg{width:15px;height:15px}
+  .sendbtn:disabled{background:#e4e4e7;color:#a1a1aa;cursor:default}
+
+  /* ============ v78: VOICE ============ */
+  /* the composer itself becomes the dark surface. same footprint, same radius,
+     same #18181b as the user chat bubble. voice = the user speaking. */
+  .composer.voice{background:#18181b;border-color:#18181b;box-shadow:none}
+  .composer.voice textarea{opacity:0;pointer-events:none}
+  .composer.voice .cbtns{opacity:0;pointer-events:none}
+
+  .voicebar{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;gap:var(--s2);
+    padding:0 8px 0 14px;opacity:0;pointer-events:none;transition:opacity .2s cubic-bezier(.16,1,.3,1)}
+  .composer.voice .voicebar{opacity:1;pointer-events:auto}
+  .vstate{font-family:var(--mono);font-size:var(--t-sm);color:rgba(250,250,250,.6);flex:none;
+    font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
+
+  /* mirrored bars: flex + align-items:center means each bar grows up AND down
+     from the centreline, which is what makes it read as a waveform not an eq */
+  .wave{flex:1;align-self:stretch;display:flex;align-items:center;justify-content:center;gap:2.5px;min-width:0}
+  .wave i{display:block;width:2px;height:2px;border-radius:1px;background:#fafafa;opacity:.3;
+    transition:height .07s linear,opacity .07s linear}
+  /* transcribing: bars settle, then a slow pulse travels through them left to right.
+     work is happening; the panel should not look finished. */
+  .composer.settled .wave i{height:2px;opacity:.28;transition:height .35s cubic-bezier(.16,1,.3,1),opacity .35s;
+    animation:scan 1.9s cubic-bezier(.4,0,.2,1) infinite;animation-delay:calc(var(--i) * .052s)}
+  @keyframes scan{
+    0%,62%{height:2px;opacity:.26}
+    14%{height:9px;opacity:.78}
+    30%{height:3px;opacity:.34}
+    100%{height:2px;opacity:.26}
+  }
+
+  .vstop{width:32px;height:32px;border-radius:8px;flex:none;border:none;background:rgba(250,250,250,.13);
+    color:#fafafa;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
+  .vstop:hover{background:rgba(250,250,250,.22)} .vstop svg{width:13px;height:13px}
+  .vstop:disabled{opacity:.4;cursor:default}
+
+  /* ---- light variant: the surface recedes, only the stop action carries weight ---- */
+  .composer.voice.lightv{background:var(--muted);border-color:var(--border)}
+  .composer.voice.lightv .vstate{color:var(--mfg)}
+  .composer.voice.lightv .wave i{background:var(--fg)}
+  .composer.voice.lightv .vstop{background:#27272a;color:#fafafa}      /* same weight as send */
+  .composer.voice.lightv .vstop:hover{background:#3f3f46}
+  .composer.voice.lightv .vstop:disabled{background:#e4e4e7;color:#a1a1aa;opacity:1}
+
+  /* notice row: model download, first-run prepare, failure. composer stays light. */
+  .cnotice{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;gap:var(--s2);
+    padding:0 10px 0 14px;opacity:0;pointer-events:none;transition:opacity .2s}
+  .composer.notice .cnotice{opacity:1;pointer-events:auto}
+  .composer.notice textarea{opacity:0;pointer-events:none}
+  .composer.notice .cbtns{opacity:0;pointer-events:none}
+  .cnotice .nt{font-family:var(--mono);font-size:var(--t-sm);color:var(--mfg);flex:1;min-width:0;
+    line-height:1.35;letter-spacing:-.01em}
+  .cnotice .nt b{font-weight:400;color:var(--fg)}
+  .retry{height:26px;padding:0 10px;border-radius:8px;border:1px solid var(--border-2);background:var(--card);
+    font-family:var(--sans);font-size:var(--t-sm);color:var(--fg);cursor:pointer;transition:.15s;flex:none}
+  .retry:hover{background:var(--muted)}
+  .cprog{position:absolute;left:0;bottom:0;height:2px;background:var(--fg);width:0;transition:width .25s linear;opacity:.55}
+  .composer.indet .cprog{width:32%;animation:indet 1.35s cubic-bezier(.4,0,.2,1) infinite}
+  @keyframes indet{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+
+  .chatfoot{display:flex;align-items:center;margin:var(--s3) var(--s6) var(--s5)}
+  .ctxbtn{display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;border-radius:7px;font-size:var(--t-sm);line-height:1;color:var(--mfg-2);background:none;border:none;cursor:pointer;transition:.15s;font-family:var(--mono)}
+  .ctxbtn:hover{color:var(--fg);background:var(--muted)} .ctxbtn svg{width:13px;height:13px}
+
+  .switcher{position:fixed;bottom:var(--s4);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:2px;background:#fff;border:1px solid var(--border-2);border-radius:10px;padding:var(--s1);box-shadow:0 4px 16px rgba(0,0,0,.08);flex-wrap:wrap;justify-content:center;max-width:94vw}
+  .switcher .lbl{font-size:9px;color:var(--mfg-2);letter-spacing:.12em;text-transform:uppercase;padding:0 var(--s2) 0 6px;font-family:var(--mono)}
+  .switcher button{font-family:var(--sans);font-size:var(--t-sm);background:none;border:none;color:var(--mfg);padding:6px var(--s3);border-radius:7px;cursor:pointer;transition:.15s}
+  .switcher button:hover{color:var(--fg)} .switcher button.on{background:var(--muted);color:var(--fg);font-weight:500}
+
+  .srcnote{position:fixed;top:var(--s4);left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:10px;
+    color:var(--mfg-2);letter-spacing:.02em;background:#fff;border:1px solid var(--border);padding:5px 10px;border-radius:8px}
+  .srcnote b{color:var(--fg);font-weight:500}
+
+  @media (prefers-reduced-motion:reduce){.markwrap::after{animation:none;opacity:0}.composer.indet .cprog{animation:none;width:100%}.wave i{transition:none}.composer.settled .wave i{animation-duration:3.4s}}
+</style>
+</head>
+<body>
+  <div class="srcnote" id="srcnote">mic: <b>checking…</b></div>
+
+  <div class="card working returning" id="card">
+    <div class="cardtop">
+      <div class="statuschip" id="status"><span class="sdot"></span><span id="statusLabel">Agent is working</span></div>
+      <button class="iconbtn" title="open yield-context.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></button>
+      <button class="iconbtn" title="close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+
+    <div class="centre">
+      <div class="markwrap"><svg preserveAspectRatio="xMidYMid meet" width="100%" height="100%" viewBox="19.5652 19.5652 260.87 260.87" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g filter="url(#filter0_i_16_2)">
+<rect x="19.5652" y="19.5652" width="260.87" height="260.87" rx="52.1739" fill="url(#paint2_linear_16_2)"/>
+<path d="M139.625 91.3044H92.8885C92.1417 91.3044 91.7683 91.3044 91.5363 91.5363C91.3043 91.7683 91.3043 92.1417 91.3043 92.8885V161.8C91.3043 162.547 91.3043 162.921 91.5363 163.153C91.7683 163.385 92.1417 163.385 92.8885 163.385H137.675C139.176 163.385 139.927 163.385 140.396 163.887C140.866 164.39 140.818 165.101 140.721 166.523C138.827 194.484 107.801 207.98 93.2845 214.474C172.89 221.603 204.969 175.662 204.969 152.295V92.8885C204.969 92.1417 204.969 91.7683 204.737 91.5363C204.505 91.3044 204.132 91.3044 203.385 91.3044H159.274C158.601 91.3044 158.265 91.3044 158.043 91.4949C157.82 91.6855 157.766 92.0328 157.658 92.7276C156.139 102.514 149.363 109.996 144.033 113.42C142.852 114.178 142.262 114.558 141.824 114.237C141.385 113.917 141.589 113.157 141.996 111.638C143.809 104.869 142.687 98.0531 141.135 92.4433C140.985 91.8996 140.91 91.6278 140.697 91.4661C140.485 91.3044 140.198 91.3044 139.625 91.3044Z" fill="url(#paint3_linear_16_2)" stroke="url(#paint4_linear_16_2)" stroke-width="1.38616"/>
+</g>
+<defs>
+<filter id="filter0_i_16_2" x="19.5652" y="19.5652" width="260.87" height="260.87" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="-6.52174"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0"/>
+<feBlend mode="normal" in2="shape" result="effect1_innerShadow_16_2"/>
+</filter>
+<linearGradient id="paint0_linear_16_2" x1="150" y1="-175.815" x2="150" y2="293.478" gradientUnits="userSpaceOnUse">
+<stop stop-color="#171717"/>
+<stop offset="1" stop-color="#676767"/>
+</linearGradient>
+<linearGradient id="paint1_linear_16_2" x1="150" y1="6.52173" x2="150" y2="388.043" gradientUnits="userSpaceOnUse">
+<stop stop-color="#676767"/>
+<stop offset="0.362979" stop-color="#171717"/>
+<stop offset="1" stop-color="#676767"/>
+</linearGradient>
+<linearGradient id="paint2_linear_16_2" x1="150" y1="-213.354" x2="150" y2="274.224" gradientUnits="userSpaceOnUse">
+<stop stop-color="#676767"/>
+<stop offset="1" stop-color="#171717"/>
+</linearGradient>
+<linearGradient id="paint3_linear_16_2" x1="148.137" y1="127.446" x2="148.137" y2="197.147" gradientUnits="userSpaceOnUse">
+<stop stop-color="#F5F5F5"/>
+<stop offset="1" stop-color="#868686"/>
+</linearGradient>
+<linearGradient id="paint4_linear_16_2" x1="148.137" y1="127.446" x2="148.137" y2="197.147" gradientUnits="userSpaceOnUse">
+<stop stop-color="#F5F5F5"/>
+<stop offset="1" stop-color="#868686"/>
+</linearGradient>
+</defs>
+</svg></div>
+      <div class="greet">
+        <div class="h1" id="greetH1"></div>
+        <div class="h2">Feed your agent, sharpen its output</div>
+        <p>Everything you add is saved to <span class="m">yield-context.md</span> and read before every response, so your agent always has your context on hand.
+      </div>
+    </div>
+
+    <div class="chat">
+      <div class="composer" id="composer">
+        <textarea id="input" placeholder="Add context in as much detail as you like.&#10;The richer it is, the better its replies."></textarea>
+
+        <div class="cbtns">
+          <button class="micbtn" id="micbtn" title="Speak instead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></button>
+          <button class="sendbtn" id="sendbtn" disabled title="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
+        </div>
+
+        <div class="voicebar" id="voicebar">
+          <span class="vstate" id="vstate">0:00</span>
+          <div class="wave" id="wave"></div>
+          <button class="vstop" id="vstop" title="Stop recording"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg></button>
+        </div>
+
+        <div class="cnotice" id="cnotice">
+          <span class="nt" id="noticetext"></span>
+          <button class="retry" id="retrybtn" style="display:none">Retry</button>
+        </div>
+        <div class="cprog" id="cprog"></div>
+      </div>
+
+      <div class="chatfoot">
+        <button class="ctxbtn" id="ctxbtn" title="open yield-context.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span id="ctxlabel">3 notes</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="switcher">
+    <span class="lbl">voice</span>
+    <button data-v="idle" class="on">idle</button>
+    <button data-v="recording">recording</button>
+    <button data-v="transcribing">transcribing</button>
+    <button data-v="reviewing">reviewing</button>
+    <button data-v="downloading">downloading</button>
+    <button data-v="preparing">first run</button>
+    <button data-v="error">failed</button>
+    <span class="lbl" style="padding-left:var(--s3)">surface</span>
+    <button data-s="dark" id="sDark">dark</button>
+    <button data-s="light" id="sLight" class="on">light</button>
+  </div>
+
+<script>
+  const card=document.getElementById('card'), composer=document.getElementById('composer'),
+        input=document.getElementById('input'), micbtn=document.getElementById('micbtn'),
+        sendbtn=document.getElementById('sendbtn'), wave=document.getElementById('wave'),
+        vstate=document.getElementById('vstate'), vstop=document.getElementById('vstop'),
+        noticetext=document.getElementById('noticetext'), retrybtn=document.getElementById('retrybtn'),
+        cprog=document.getElementById('cprog'), srcnote=document.getElementById('srcnote'),
+        h1=document.getElementById('greetH1');
+
+  h1.innerHTML='Every wait can <span class="ydplain">yield</span> something';
+
+  /* ---------- waveform ---------- */
+  const HALF=15, BARS=HALF*2;                 // 15 real values, mirrored -> 30 bars
+  const bars=[];
+  for(let i=0;i<BARS;i++){const b=document.createElement('i');b.style.setProperty('--i',i);wave.appendChild(b);bars.push(b);}
+
+  let audioCtx=null, analyser=null, stream=null, rafId=null, simulated=false, freq=null;
+
+  function paint(vals){                        // vals: HALF values 0..1, low->high freq
+    for(let i=0;i<HALF;i++){
+      const v=vals[i];
+      const h=2+v*30;
+      const left=bars[HALF-1-i], right=bars[HALF+i];   // mirror around the centreline
+      left.style.height=right.style.height=h.toFixed(1)+'px';
+      left.style.opacity=right.style.opacity=(0.3+v*0.7).toFixed(2);
+    }
+  }
+
+  function realFrame(){
+    analyser.getByteFrequencyData(freq);
+    const n=freq.length, vals=[];
+    for(let i=0;i<HALF;i++){                   // log-spaced bins so it isn't all bass
+      const a=Math.floor(Math.pow(i/HALF,1.7)*n*0.55);
+      const b=Math.max(a+1,Math.floor(Math.pow((i+1)/HALF,1.7)*n*0.55));
+      let s=0; for(let j=a;j<b;j++) s+=freq[j];
+      vals.push(Math.min(1,(s/(b-a))/175));
+    }
+    paint(vals);
+    rafId=requestAnimationFrame(realFrame);
+  }
+
+  let simT=0;
+  function simFrame(){                          // fallback only, and it says so on screen
+    simT+=0.09; const vals=[];
+    for(let i=0;i<HALF;i++){
+      const v=(Math.sin(simT*1.6+i*0.55)*0.5+0.5)*(Math.sin(simT*0.7+i)*0.35+0.55);
+      vals.push(Math.max(0.04,v*(1-i/(HALF*1.5))));
+    }
+    paint(vals);
+    rafId=requestAnimationFrame(simFrame);
+  }
+
+  async function startMic(){
+    try{
+      stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      const src=audioCtx.createMediaStreamSource(stream);
+      analyser=audioCtx.createAnalyser();
+      analyser.fftSize=1024; analyser.smoothingTimeConstant=0.75;
+      freq=new Uint8Array(analyser.frequencyBinCount);
+      src.connect(analyser);
+      simulated=false; srcnote.innerHTML='mic: <b>live</b> · bars are real amplitude';
+      rafId=requestAnimationFrame(realFrame);
+    }catch(e){
+      simulated=true; srcnote.innerHTML='mic: <b>unavailable</b> · bars simulated ('+e.name+')';
+      rafId=requestAnimationFrame(simFrame);
+    }
+  }
+  function stopMic(){
+    if(rafId) cancelAnimationFrame(rafId); rafId=null;
+    if(stream){stream.getTracks().forEach(t=>t.stop()); stream=null;}
+    if(audioCtx){audioCtx.close(); audioCtx=null;}
+  }
+
+  /* ---------- timer ---------- */
+  let secs=0, tick=null;
+  const fmt=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+
+  /* ---------- states ---------- */
+  const TRANSCRIPT="Use pnpm for everything, never npm. And don't touch the legacy folder, it's being deleted next sprint.";
+  let progT=null;
+
+  function clearAll(){
+    composer.classList.remove('voice','settled','notice','indet');
+    composer.classList.toggle('lightv',surface==='light');
+    retrybtn.style.display='none'; cprog.style.width='0';
+    if(tick){clearInterval(tick);tick=null;}
+    if(progT){clearInterval(progT);progT=null;}
+    stopMic();
+  }
+
+  function setState(v){
+    document.querySelectorAll('.switcher button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
+    clearAll();
+
+    if(v==='idle'){
+      input.value=''; sendbtn.disabled=true;
+      srcnote.innerHTML='mic: <b>idle</b> · click the mic to record';
+    }
+
+    if(v==='recording'){
+      composer.classList.add('voice');
+      secs=0; vstate.textContent='0:00'; vstop.disabled=false;
+      tick=setInterval(()=>{secs++;vstate.textContent=fmt(secs);},1000);
+      startMic();
+    }
+
+    if(v==='transcribing'){
+      bars.forEach(b=>{b.style.height='';b.style.opacity='';});   // drop recording's inline values so the scan can drive them
+      composer.classList.add('voice','settled');   // bars settle, then the scan pulse runs
+      vstate.textContent='Transcribing…'; vstop.disabled=true;
+      srcnote.innerHTML='mic: <b>stopped</b> · ~0.6s cold, ~0.3s warm';
+    }
+
+    if(v==='reviewing'){
+      input.value=TRANSCRIPT; sendbtn.disabled=false;
+      input.focus(); input.setSelectionRange(TRANSCRIPT.length,TRANSCRIPT.length);
+      srcnote.innerHTML='mic: <b>done</b> · transcript is editable before saving';
+    }
+
+    if(v==='downloading'){
+      composer.classList.add('notice');
+      let p=0; noticetext.innerHTML='Downloading voice model… <b>0%</b>';
+      cprog.style.width='0';
+      progT=setInterval(()=>{
+        p=Math.min(100,p+Math.random()*7);
+        noticetext.innerHTML='Downloading voice model… <b>'+Math.floor(p)+'%</b>';
+        cprog.style.width=p+'%';
+        if(p>=100){clearInterval(progT);progT=null;noticetext.innerHTML='<b>Voice model ready.</b>';}
+      },260);
+      srcnote.innerHTML='mic: <b>first use</b> · 141 MB, once, cached';
+    }
+
+    if(v==='preparing'){
+      composer.classList.add('notice','indet');
+      noticetext.innerHTML='Preparing voice. This happens once after install.';
+      srcnote.innerHTML='mic: <b>first run</b> · macOS verifying the binaries (~15s)';
+    }
+
+    if(v==='error'){
+      composer.classList.add('notice');
+      noticetext.innerHTML='Could not transcribe that. <b>Your recording is safe.</b>';
+      retrybtn.style.display='block';
+      srcnote.innerHTML='mic: <b>failed</b> · audio kept, retry offered';
+    }
+  }
+
+  document.querySelectorAll('.switcher button[data-v]').forEach(b=>b.addEventListener('click',()=>setState(b.dataset.v)));
+
+  let surface='light';
+  function setSurface(v){
+    surface=v;
+    document.getElementById('sDark').classList.toggle('on',v==='dark');
+    document.getElementById('sLight').classList.toggle('on',v==='light');
+    composer.classList.toggle('lightv',v==='light');
+  }
+  document.querySelectorAll('.switcher button[data-s]').forEach(b=>b.addEventListener('click',()=>setSurface(b.dataset.s)));
+
+  /* real flow: mic -> record -> stop -> transcribe -> review */
+  micbtn.addEventListener('click',()=>setState('recording'));
+  vstop.addEventListener('click',()=>{
+    setState('transcribing');
+    setTimeout(()=>setState('reviewing'),1400);
+  });
+  retrybtn.addEventListener('click',()=>{
+    setState('transcribing');
+    setTimeout(()=>setState('reviewing'),1400);
+  });
+  input.addEventListener('input',()=>{sendbtn.disabled=!input.value.trim();});
+
+  setSurface('light');
+  setState('idle');
+</script>
+</body>
+</html>

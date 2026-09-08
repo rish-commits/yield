@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Yield — v57 · sliding-window chat</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s8:32px;--s10:40px;
+    --t-xs:11px;--t-sm:12px;--t-base:12.5px;--t-md:13.5px;--t-lg:19px;
+    --bg:#f4f4f5;--card:#fff;--muted:#f4f4f5;--muted-2:#e4e4e7;
+    --border:rgba(0,0,0,.08);--border-2:rgba(0,0,0,.13);
+    --fg:#18181b;--mfg:#52525b;--mfg-2:#a1a1aa;--ring:rgba(0,0,0,.22);--green:#22c55e;
+    --sans:'Geist','Geist Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --mono:'Geist Mono',ui-monospace,monospace;
+    --geist:'Geist','Geist Sans',-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);font-family:var(--sans);color:var(--fg);display:flex;align-items:center;justify-content:center;padding:var(--s6);-webkit-font-smoothing:antialiased}
+  .card{width:min(400px,94vw);background:var(--card);border:1px solid var(--border);border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04),0 8px 30px -12px rgba(0,0,0,.12)}
+
+  .cardtop{display:flex;align-items:center;gap:var(--s1);height:48px;padding:0 var(--s3)}
+  .iconbtn{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--mfg-2);cursor:pointer;transition:.15s;background:none;border:none}
+  .iconbtn:hover{background:var(--muted);color:var(--mfg)} .iconbtn svg{width:16px;height:16px}
+  .statuschip{display:flex;align-items:center;gap:var(--s2);font-size:var(--t-sm);line-height:1.3;color:var(--mfg);padding:var(--s1) var(--s3) var(--s1) var(--s2);border-radius:999px;cursor:pointer;margin-right:auto;transition:.15s}
+  .statuschip:hover{background:var(--muted)}
+  .sdot{width:7px;height:7px;border-radius:50%;background:#d4d4d8;transition:.3s;flex:none}
+  .card.working .sdot{background:var(--green);box-shadow:0 0 8px rgba(34,197,94,.45)}
+
+  .centre{display:flex;flex-direction:column;align-items:center;text-align:center;padding:var(--s2) var(--s6) 0}
+  .markwrap{position:relative;width:52px;height:52px;border-radius:13px;overflow:hidden;box-shadow:0 4px 14px rgba(10,13,18,.28)}
+  .markwrap .mark{width:52px;height:52px;border-radius:13px;display:block}
+  .markwrap::after{content:"";position:absolute;top:-60%;left:-30%;width:40%;height:220%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);transform:rotate(18deg);pointer-events:none;animation:marksheen 6s ease-in-out infinite}
+  @keyframes marksheen{0%{left:-40%}22%{left:130%}100%{left:130%}}
+  .greet{margin-top:var(--s4)}
+  .greet .h1{font-family:var(--geist);font-size:var(--t-lg);font-weight:600;line-height:1.25;color:var(--fg);letter-spacing:-.02em}
+  .ydplain{font-weight:inherit}
+  .greet .h2{font-family:var(--geist);font-size:var(--t-md);font-weight:500;line-height:1.3;letter-spacing:-.01em;color:var(--mfg);margin-top:var(--s1)}
+  .greet p{font-family:var(--mono);font-size:11.5px;line-height:1.55;color:var(--mfg);margin-top:var(--s3);max-width:310px;letter-spacing:-.01em}
+  .greet p .m{font-family:var(--mono);font-size:var(--t-sm);color:var(--fg);background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.045);border-radius:5px;padding:1px 6px;white-space:nowrap}
+  .card.returning .greet p{display:none}   /* returning users know the mechanism; hide the teaching copy */
+
+  /* ============ sliding-window chat: ever-growing stack, only ~2 visible ============ */
+  .chat{margin-top:var(--s4);display:flex;flex-direction:column}
+
+  /* the viewport: fixed short height; messages stack bottom-anchored; overflow hidden (old ones slide up & out) */
+  .stream{position:relative;height:132px;overflow:hidden;padding:0 var(--s6);
+    -webkit-mask-image:linear-gradient(to bottom, transparent 0, rgba(0,0,0,.4) 22px, #000 48px);
+    mask-image:linear-gradient(to bottom, transparent 0, rgba(0,0,0,.4) 22px, #000 48px);}
+  .stream .inner{display:flex;flex-direction:column;gap:var(--s2);min-height:100%;justify-content:flex-end;padding:6px 0}
+
+  .msg{display:flex;gap:var(--s2);max-width:100%;
+    animation:msgin .5s cubic-bezier(.16,1,.3,1);
+    transition:opacity .7s cubic-bezier(.4,0,.2,1), filter .7s cubic-bezier(.4,0,.2,1), transform .7s cubic-bezier(.4,0,.2,1)}
+  .msg.user{flex-direction:row-reverse}
+  .msg.fadeup{opacity:0;filter:blur(7px);transform:translateY(-14px) scale(.985)}
+  .msg .av{width:22px;height:22px;border-radius:6px;flex:none;overflow:hidden;box-shadow:0 1px 3px rgba(10,13,18,.22)}
+  .msg .av img{width:100%;height:100%;display:block}
+  .msg.assistant .body{background:var(--muted);color:var(--fg);padding:8px 11px;border-radius:12px;border-top-left-radius:4px;max-width:84%;font-size:var(--t-base);line-height:1.45}
+  .msg.user .body{background:#18181b;color:#fafafa;padding:8px 11px;border-radius:12px;border-top-right-radius:4px;max-width:84%;font-size:var(--t-base);line-height:1.45}
+  @keyframes msgin{from{opacity:0;transform:translateY(10px);filter:blur(3px)}to{opacity:1;transform:none;filter:blur(0)}}
+  .msg.entering{animation:msgin .55s cubic-bezier(.16,1,.3,1)}
+  .msg.assistant .body.typing::after{content:'';display:inline-block;width:2px;height:1em;background:var(--mfg);margin-left:1px;vertical-align:-2px;animation:caret .8s steps(1) infinite}
+  @keyframes caret{0%,50%{opacity:1}50.01%,100%{opacity:0}}
+
+  /* first-time question options — minimal rows (↵ + text + divider), no chips */
+  .qopts{display:flex;flex-direction:column;padding:0 var(--s6);margin-top:var(--s2)}
+  .qopts.hide{display:none}
+  .card.coldstart .qopts{display:none}
+  .qopt{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;
+    border-top:1px solid var(--border);padding:10px 2px;cursor:pointer;transition:.15s;font-family:var(--sans)}
+  .qopt:first-child{border-top:none}
+  .qopt .qret{flex:none;color:var(--mfg-2);display:flex;transition:.15s}
+  .qopt .qret svg{width:12px;height:12px}
+  .qopt:hover .qret{color:var(--fg)}
+  .qopt .qt{flex:1;min-width:0;font-size:11px;color:var(--fg);line-height:1.3;transition:color .15s;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .qopt:hover .qt{color:#000}
+
+  /* composer */
+  .composer{margin:var(--s4) var(--s6) 0;position:relative;background:var(--card);border:1px solid var(--border);border-radius:13px;transition:border-color .15s,box-shadow .15s}
+  .card.coldstart .composer textarea{min-height:84px}
+  .composer:focus-within{border-color:var(--ring);box-shadow:0 0 0 3px rgba(0,0,0,.05)}
+  .composer textarea{width:100%;min-height:64px;max-height:120px;resize:none;background:transparent;border:none;outline:none;padding:12px 76px 12px 14px;font-family:var(--geist);font-size:var(--t-base);color:var(--fg);line-height:1.5}
+  .composer textarea::placeholder{color:var(--mfg-2);line-height:1.5}
+  .cbtns{position:absolute;right:7px;top:6px;display:flex;align-items:center;gap:4px}
+  .micbtn{width:32px;height:32px;border-radius:8px;border:none;background:none;display:flex;align-items:center;justify-content:center;color:var(--mfg-2);cursor:pointer;transition:.15s}
+  .micbtn:hover{color:var(--fg);background:var(--muted)} .micbtn svg{width:16px;height:16px}
+  .sendbtn{width:32px;height:32px;border-radius:8px;border:none;background:#27272a;color:#fafafa;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
+  .sendbtn:hover{background:#3f3f46} .sendbtn svg{width:15px;height:15px}
+  .sendbtn:disabled{background:#e4e4e7;color:#a1a1aa;cursor:default}
+
+  .chatfoot{display:flex;align-items:center;margin:var(--s3) var(--s6) var(--s5)}
+  .ctxbtn{display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;border-radius:7px;font-size:var(--t-sm);line-height:1;color:var(--mfg-2);background:none;border:none;cursor:pointer;transition:.15s;font-family:var(--mono)}
+  .ctxbtn:hover{color:var(--fg);background:var(--muted)} .ctxbtn svg{width:13px;height:13px}
+  .ctxbtn.saved #ctxlabel{color:var(--green)} .ctxbtn #ctxlabel{transition:color .3s}
+
+  .switcher{position:fixed;bottom:var(--s4);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:2px;background:#fff;border:1px solid var(--border-2);border-radius:10px;padding:var(--s1);box-shadow:0 4px 16px rgba(0,0,0,.08)}
+  .switcher .lbl{font-size:9px;color:var(--mfg-2);letter-spacing:.12em;text-transform:uppercase;padding:0 var(--s2) 0 6px;font-family:var(--mono)}
+  .switcher button{font-family:var(--sans);font-size:var(--t-sm);background:none;border:none;color:var(--mfg);padding:6px var(--s3);border-radius:7px;cursor:pointer;transition:.15s}
+  .switcher button:hover{color:var(--fg)} .switcher button.on{background:var(--muted);color:var(--fg);font-weight:500}
+  @media (prefers-reduced-motion:reduce){.markwrap::after{animation:none;opacity:0}.msg,.stream .inner{animation:none;transition:none}}
+</style>
+</head>
+<body>
+  <div class="card working coldstart" id="card">
+    <div class="cardtop">
+      <div class="statuschip" id="status"><span class="sdot"></span><span id="statusLabel">Claude is working</span></div>
+      <button class="iconbtn" title="open yield-context.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></button>
+      <button class="iconbtn" title="close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+
+    <div class="centre">
+      <div class="markwrap"><svg preserveAspectRatio="xMidYMid meet" width="100%" height="100%" viewBox="19.5652 19.5652 260.87 260.87" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g filter="url(#filter0_i_16_2)">
+<rect x="19.5652" y="19.5652" width="260.87" height="260.87" rx="52.1739" fill="url(#paint2_linear_16_2)"/>
+<path d="M139.625 91.3044H92.8885C92.1417 91.3044 91.7683 91.3044 91.5363 91.5363C91.3043 91.7683 91.3043 92.1417 91.3043 92.8885V161.8C91.3043 162.547 91.3043 162.921 91.5363 163.153C91.7683 163.385 92.1417 163.385 92.8885 163.385H137.675C139.176 163.385 139.927 163.385 140.396 163.887C140.866 164.39 140.818 165.101 140.721 166.523C138.827 194.484 107.801 207.98 93.2845 214.474C172.89 221.603 204.969 175.662 204.969 152.295V92.8885C204.969 92.1417 204.969 91.7683 204.737 91.5363C204.505 91.3044 204.132 91.3044 203.385 91.3044H159.274C158.601 91.3044 158.265 91.3044 158.043 91.4949C157.82 91.6855 157.766 92.0328 157.658 92.7276C156.139 102.514 149.363 109.996 144.033 113.42C142.852 114.178 142.262 114.558 141.824 114.237C141.385 113.917 141.589 113.157 141.996 111.638C143.809 104.869 142.687 98.0531 141.135 92.4433C140.985 91.8996 140.91 91.6278 140.697 91.4661C140.485 91.3044 140.198 91.3044 139.625 91.3044Z" fill="url(#paint3_linear_16_2)" stroke="url(#paint4_linear_16_2)" stroke-width="1.38616"/>
+</g>
+<defs>
+<filter id="filter0_i_16_2" x="19.5652" y="19.5652" width="260.87" height="260.87" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+<feOffset dy="-6.52174"/>
+<feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+<feColorMatrix type="matrix" values="0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.04 0"/>
+<feBlend mode="normal" in2="shape" result="effect1_innerShadow_16_2"/>
+</filter>
+<linearGradient id="paint0_linear_16_2" x1="150" y1="-175.815" x2="150" y2="293.478" gradientUnits="userSpaceOnUse">
+<stop stop-color="#171717"/>
+<stop offset="1" stop-color="#676767"/>
+</linearGradient>
+<linearGradient id="paint1_linear_16_2" x1="150" y1="6.52173" x2="150" y2="388.043" gradientUnits="userSpaceOnUse">
+<stop stop-color="#676767"/>
+<stop offset="0.362979" stop-color="#171717"/>
+<stop offset="1" stop-color="#676767"/>
+</linearGradient>
+<linearGradient id="paint2_linear_16_2" x1="150" y1="-213.354" x2="150" y2="274.224" gradientUnits="userSpaceOnUse">
+<stop stop-color="#676767"/>
+<stop offset="1" stop-color="#171717"/>
+</linearGradient>
+<linearGradient id="paint3_linear_16_2" x1="148.137" y1="127.446" x2="148.137" y2="197.147" gradientUnits="userSpaceOnUse">
+<stop stop-color="#F5F5F5"/>
+<stop offset="1" stop-color="#868686"/>
+</linearGradient>
+<linearGradient id="paint4_linear_16_2" x1="148.137" y1="127.446" x2="148.137" y2="197.147" gradientUnits="userSpaceOnUse">
+<stop stop-color="#F5F5F5"/>
+<stop offset="1" stop-color="#868686"/>
+</linearGradient>
+</defs>
+</svg></div>
+
+      <div class="greet">
+        <div class="h1" id="greetH1"></div>
+        <div class="h2">Feed your agent, sharpen its output</div>
+        <p>Everything you add is saved to <span class="m">yield-context.md</span> and read before every response, so your agent always has your context on hand.</p>
+      </div>
+    </div>
+
+    <div class="chat">
+      <!-- sliding-window stream (hidden until conversation starts) -->
+      <div class="stream" id="stream" style="display:none"><div class="inner" id="inner"></div></div>
+
+      <!-- first-time: two question options -->
+      <div class="qopts" id="qopts">
+        <button class="qopt" data-q="Any auth patterns Claude should stick to?"><span class="qret"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg></span><span class="qt">Any auth patterns Claude should stick to?</span></button>
+        <button class="qopt" data-q="Where does this deploy, and any gotchas?"><span class="qret"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 10 4 15 9 20"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></svg></span><span class="qt">Where does this deploy, and any gotchas?</span></button>
+      </div>
+
+      <div class="composer">
+        <textarea id="input" placeholder="Add context in as much detail as you like.\nThe richer it is, the better its replies."></textarea>
+        <div class="cbtns">
+          <button class="micbtn" id="micbtn" title="Speak instead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg></button>
+          <button class="sendbtn" id="sendbtn" disabled title="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
+        </div>
+      </div>
+
+      <div class="chatfoot">
+        <button class="ctxbtn" id="ctxbtn" title="open yield-context.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg><span id="ctxlabel">yield-context.md</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="switcher">
+    <span class="lbl">preview</span>
+    <button data-v="cold" class="on">first · cold</button>
+    <button data-v="ctx">first · with context</button>
+    <button data-v="return">returning</button>
+  </div>
+
+<script>
+  const card=document.getElementById('card'), input=document.getElementById('input'),
+        statusLabel=document.getElementById('statusLabel'), h1=document.getElementById('greetH1'),
+        stream=document.getElementById('stream'), inner=document.getElementById('inner'), qopts=document.getElementById('qopts'),
+        sendbtn=document.getElementById('sendbtn'), ctxbtn=document.getElementById('ctxbtn'), ctxlabel=document.getElementById('ctxlabel');
+  const LOGO="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgdmlld0JveD0iMTkuNTY1MiAxOS41NjUyIDI2MC44NyAyNjAuODciIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxnIGZpbHRlcj0idXJsKCNmaWx0ZXIwX2lfMTZfMikiPgo8cmVjdCB4PSIxOS41NjUyIiB5PSIxOS41NjUyIiB3aWR0aD0iMjYwLjg3IiBoZWlnaHQ9IjI2MC44NyIgcng9IjUyLjE3MzkiIGZpbGw9InVybCgjcGFpbnQyX2xpbmVhcl8xNl8yKSIvPgo8cGF0aCBkPSJNMTM5LjYyNSA5MS4zMDQ0SDkyLjg4ODVDOTIuMTQxNyA5MS4zMDQ0IDkxLjc2ODMgOTEuMzA0NCA5MS41MzYzIDkxLjUzNjNDOTEuMzA0MyA5MS43NjgzIDkxLjMwNDMgOTIuMTQxNyA5MS4zMDQzIDkyLjg4ODVWMTYxLjhDOTEuMzA0MyAxNjIuNTQ3IDkxLjMwNDMgMTYyLjkyMSA5MS41MzYzIDE2My4xNTNDOTEuNzY4MyAxNjMuMzg1IDkyLjE0MTcgMTYzLjM4NSA5Mi44ODg1IDE2My4zODVIMTM3LjY3NUMxMzkuMTc2IDE2My4zODUgMTM5LjkyNyAxNjMuMzg1IDE0MC4zOTYgMTYzLjg4N0MxNDAuODY2IDE2NC4zOSAxNDAuODE4IDE2NS4xMDEgMTQwLjcyMSAxNjYuNTIzQzEzOC44MjcgMTk0LjQ4NCAxMDcuODAxIDIwNy45OCA5My4yODQ1IDIxNC40NzRDMTcyLjg5IDIyMS42MDMgMjA0Ljk2OSAxNzUuNjYyIDIwNC45NjkgMTUyLjI5NVY5Mi44ODg1QzIwNC45NjkgOTIuMTQxNyAyMDQuOTY5IDkxLjc2ODMgMjA0LjczNyA5MS41MzYzQzIwNC41MDUgOTEuMzA0NCAyMDQuMTMyIDkxLjMwNDQgMjAzLjM4NSA5MS4zMDQ0SDE1OS4yNzRDMTU4LjYwMSA5MS4zMDQ0IDE1OC4yNjUgOTEuMzA0NCAxNTguMDQzIDkxLjQ5NDlDMTU3LjgyIDkxLjY4NTUgMTU3Ljc2NiA5Mi4wMzI4IDE1Ny42NTggOTIuNzI3NkMxNTYuMTM5IDEwMi41MTQgMTQ5LjM2MyAxMDkuOTk2IDE0NC4wMzMgMTEzLjQyQzE0Mi44NTIgMTE0LjE3OCAxNDIuMjYyIDExNC41NTggMTQxLjgyNCAxMTQuMjM3QzE0MS4zODUgMTEzLjkxNyAxNDEuNTg5IDExMy4xNTcgMTQxLjk5NiAxMTEuNjM4QzE0My44MDkgMTA0Ljg2OSAxNDIuNjg3IDk4LjA1MzEgMTQxLjEzNSA5Mi40NDMzQzE0MC45ODUgOTEuODk5NiAxNDAuOTEgOTEuNjI3OCAxNDAuNjk3IDkxLjQ2NjFDMTQwLjQ4NSA5MS4zMDQ0IDE0MC4xOTggOTEuMzA0NCAxMzkuNjI1IDkxLjMwNDRaIiBmaWxsPSJ1cmwoI3BhaW50M19saW5lYXJfMTZfMikiIHN0cm9rZT0idXJsKCNwYWludDRfbGluZWFyXzE2XzIpIiBzdHJva2Utd2lkdGg9IjEuMzg2MTYiLz4KPC9nPgo8ZGVmcz4KPGZpbHRlciBpZD0iZmlsdGVyMF9pXzE2XzIiIHg9IjE5LjU2NTIiIHk9IjE5LjU2NTIiIHdpZHRoPSIyNjAuODciIGhlaWdodD0iMjYwLjg3IiBmaWx0ZXJVbml0cz0idXNlclNwYWNlT25Vc2UiIGNvbG9yLWludGVycG9sYXRpb24tZmlsdGVycz0ic1JHQiI+CjxmZUZsb29kIGZsb29kLW9wYWNpdHk9IjAiIHJlc3VsdD0iQmFja2dyb3VuZEltYWdlRml4Ii8+CjxmZUJsZW5kIG1vZGU9Im5vcm1hbCIgaW49IlNvdXJjZUdyYXBoaWMiIGluMj0iQmFja2dyb3VuZEltYWdlRml4IiByZXN1bHQ9InNoYXBlIi8+CjxmZUNvbG9yTWF0cml4IGluPSJTb3VyY2VBbHBoYSIgdHlwZT0ibWF0cml4IiB2YWx1ZXM9IjAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDAgMCAwIDEyNyAwIiByZXN1bHQ9ImhhcmRBbHBoYSIvPgo8ZmVPZmZzZXQgZHk9Ii02LjUyMTc0Ii8+CjxmZUNvbXBvc2l0ZSBpbjI9ImhhcmRBbHBoYSIgb3BlcmF0b3I9ImFyaXRobWV0aWMiIGsyPSItMSIgazM9IjEiLz4KPGZlQ29sb3JNYXRyaXggdHlwZT0ibWF0cml4IiB2YWx1ZXM9IjAgMCAwIDAgMSAwIDAgMCAwIDEgMCAwIDAgMCAxIDAgMCAwIDAuMDQgMCIvPgo8ZmVCbGVuZCBtb2RlPSJub3JtYWwiIGluMj0ic2hhcGUiIHJlc3VsdD0iZWZmZWN0MV9pbm5lclNoYWRvd18xNl8yIi8+CjwvZmlsdGVyPgo8bGluZWFyR3JhZGllbnQgaWQ9InBhaW50MF9saW5lYXJfMTZfMiIgeDE9IjE1MCIgeTE9Ii0xNzUuODE1IiB4Mj0iMTUwIiB5Mj0iMjkzLjQ3OCIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgo8c3RvcCBzdG9wLWNvbG9yPSIjMTcxNzE3Ii8+CjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzY3Njc2NyIvPgo8L2xpbmVhckdyYWRpZW50Pgo8bGluZWFyR3JhZGllbnQgaWQ9InBhaW50MV9saW5lYXJfMTZfMiIgeDE9IjE1MCIgeTE9IjYuNTIxNzMiIHgyPSIxNTAiIHkyPSIzODguMDQzIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CjxzdG9wIHN0b3AtY29sb3I9IiM2NzY3NjciLz4KPHN0b3Agb2Zmc2V0PSIwLjM2Mjk3OSIgc3RvcC1jb2xvcj0iIzE3MTcxNyIvPgo8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM2NzY3NjciLz4KPC9saW5lYXJHcmFkaWVudD4KPGxpbmVhckdyYWRpZW50IGlkPSJwYWludDJfbGluZWFyXzE2XzIiIHgxPSIxNTAiIHkxPSItMjEzLjM1NCIgeDI9IjE1MCIgeTI9IjI3NC4yMjQiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KPHN0b3Agc3RvcC1jb2xvcj0iIzY3Njc2NyIvPgo8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMxNzE3MTciLz4KPC9saW5lYXJHcmFkaWVudD4KPGxpbmVhckdyYWRpZW50IGlkPSJwYWludDNfbGluZWFyXzE2XzIiIHgxPSIxNDguMTM3IiB5MT0iMTI3LjQ0NiIgeDI9IjE0OC4xMzciIHkyPSIxOTcuMTQ3IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CjxzdG9wIHN0b3AtY29sb3I9IiNGNUY1RjUiLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjODY4Njg2Ii8+CjwvbGluZWFyR3JhZGllbnQ+CjxsaW5lYXJHcmFkaWVudCBpZD0icGFpbnQ0X2xpbmVhcl8xNl8yIiB4MT0iMTQ4LjEzNyIgeTE9IjEyNy40NDYiIHgyPSIxNDguMTM3IiB5Mj0iMTk3LjE0NyIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgo8c3RvcCBzdG9wLWNvbG9yPSIjRjVGNUY1Ii8+CjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzg2ODY4NiIvPgo8L2xpbmVhckdyYWRpZW50Pgo8L2RlZnM+Cjwvc3ZnPg==";
+  let working=true, noteCount=0;
+  // ---- reply model: A (honest ack) + B (keyword echo when possible) + C (soft optional door) ----
+  const ACK=['Saved.','Got it.','Noted.','Added.'];               // A: honest, never fakes understanding
+  const DOOR=[                                                      // C: soft optional next, never a forced question
+    'Add anything else, or you’re set.',
+    'Anything more? Otherwise you’re good.',
+    'Keep going, or leave it there.',
+    'That’s in. Add more whenever.'
+  ];
+  // B: light echo — reflect a term that is ACTUALLY present in the user's text (no faked comprehension)
+  const ECHO=[
+    {re:/supabase/i,   t:'the Supabase detail'},
+    {re:/firebase/i,   t:'the Firebase note'},
+    {re:/pnpm|npm|yarn/i, t:'your package manager'},
+    {re:/vercel|netlify|deploy/i, t:'the deploy note'},
+    {re:/auth|login|session/i, t:'the auth note'},
+    {re:/test|spec|e2e/i, t:'the testing note'},
+    {re:/snake_case|camelcase|naming/i, t:'the naming rule'},
+    {re:/typescript|\bts\b/i, t:'the TypeScript note'},
+    {re:/tailwind|css|styl/i, t:'the styling note'},
+    {re:/api|endpoint|route/i, t:'the API note'},
+    {re:/postgres|sql|schema|migration|table|quer/i, t:'the database note'}
+  ];
+  let doorStep=0, ackStep=0;
+  function buildReply(userText){
+    const echo=ECHO.find(e=>e.re.test(userText));
+    // A + B: honest ack, echoed if we detected a real keyword
+    const ack = echo ? ('Noted '+echo.t+'.') : ACK[ackStep++ % ACK.length];
+    // C: soft optional door
+    const door = DOOR[doorStep++ % DOOR.length];
+    return ack+' '+door;
+  }
+
+  h1.innerHTML='Every wait can <span class="ydplain">yield</span> something';
+  function setPreview(v){
+    document.querySelectorAll('.switcher button').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
+    // reset the stream/chat
+    inner.innerHTML=''; stream.style.display='none';
+    if(v==='cold'){
+      card.classList.add('coldstart'); card.classList.remove('returning'); qopts.classList.add('hide'); noteCount=0;
+      input.placeholder='Add context in as much detail as you like.\nThe richer it is, the better its replies.';
+    } else if(v==='ctx'){
+      card.classList.remove('coldstart'); card.classList.remove('returning'); qopts.classList.remove('hide'); noteCount=0;
+      input.placeholder='Add context in as much detail as you like.\nThe richer it is, the better its replies.';
+    } else { // returning
+      card.classList.remove('coldstart'); card.classList.add('returning'); qopts.classList.remove('hide'); noteCount=12;
+      input.placeholder='Add context in as much detail as you like.\nThe richer it is, the better its replies.';
+    }
+    settleFooter();
+  }
+  document.querySelectorAll('.switcher button').forEach(b=>b.onclick=()=>setPreview(b.dataset.v));
+  document.getElementById('status').onclick=()=>{working=card.classList.toggle('working');statusLabel.textContent=working?'Claude is working':'Idle';};
+
+  function footerLabel(){return noteCount===0?'yield-context.md':(noteCount===1?'1 note':noteCount+' notes');}
+  function settleFooter(){if(!ctxbtn.classList.contains('saved'))ctxlabel.textContent=footerLabel();}
+  function refreshSend(){sendbtn.disabled=input.value.trim().length===0;}
+  input.addEventListener('input',()=>{refreshSend();input.style.height='auto';input.style.height=Math.min(input.scrollHeight,88)+'px';});
+
+  function ensureStream(){ if(stream.style.display==='none'){ stream.style.display=''; qopts.classList.add('hide'); card.classList.remove('coldstart'); } }
+
+  // add a message to the growing stack; keep only ~2 visible (older ones blur up & out)
+  // ---- history model: one continuous stack, only the last 2 shown; moves ONE at a time ----
+  const history=[];          // {role, text, isQuestion, typed:false}
+  let viewEnd=-1;            // index of the BOTTOM (newest visible) message
+  let atLive=true;
+
+  function makeMsgEl(item, animate){
+    const m=document.createElement('div'); m.className='msg '+item.role;
+    m.dataset.i = item._i;
+    if(item.role==='assistant'){
+      m.innerHTML='<div class="av"><img src="'+LOGO+'" alt="Yield"/></div><div class="body"></div>';
+      const body=m.querySelector('.body');
+      if(animate && !item.typed){ item.typed=true; setTimeout(()=>typeInto(body,item.text,()=>{stream.scrollTop=stream.scrollHeight;}),120); }
+      else body.textContent=item.text;
+    } else {
+      m.innerHTML='<div class="body">'+item.text+'</div>';
+    }
+    return m;
+  }
+  function typeInto(el, text, done){
+    el.textContent=''; let i=0; el.classList.add('typing');
+    const tick=()=>{ if(i<=text.length){ el.textContent=text.slice(0,i); i++;
+        setTimeout(tick, 14 + Math.random()*26);
+      } else { el.classList.remove('typing'); if(done) done(); } };
+    tick();
+  }
+  // simple append model: keep all messages; new one animates in; native smooth scroll for history
+  function addMsg(role,text,isQuestion){
+    ensureStream();
+    const item={role,text,isQuestion,typed:false,_i:history.length}; history.push(item);
+    const el=makeMsgEl(item, role==='assistant');
+    el.classList.add('entering');
+    inner.appendChild(el);
+    stream.scrollTop=stream.scrollHeight;   // pin to newest
+  }
+  // (no wheel handler — native smooth scrolling handles history browsing)
+
+  document.querySelectorAll('.qopt').forEach(o=>o.onclick=()=>{
+    addMsg('assistant', o.dataset.q, true);
+    input.placeholder='Type your answer…'; input.focus();
+  });
+
+  function send(){
+    const v=input.value.trim(); if(!v) return;
+    input.value=''; input.style.height='auto'; refreshSend();
+    addMsg('user', v);
+    noteCount++; ctxbtn.classList.add('saved'); ctxlabel.textContent='Saved';
+    setTimeout(()=>{ctxbtn.classList.remove('saved');ctxlabel.textContent=footerLabel();},1400);
+    // Yield replies: honest ack (+keyword echo) + soft optional door
+    const reply=buildReply(v);
+    setTimeout(()=>{ addMsg('assistant', reply); }, 520);
+    input.placeholder='Answer, or add anything else…';
+  }
+  sendbtn.onclick=send;
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}});
+
+  setPreview('cold');
+</script>
+</body>
+</html>

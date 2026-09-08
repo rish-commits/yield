@@ -1,0 +1,73 @@
+{
+  "name": "yield",
+  "displayName": "Yield: Context for Claude Code",
+  "description": "Save notes while Claude Code works. They come back as project context on every later run.",
+  "version": "1.7.0",
+  "publisher": "rishab",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rish-commits/yield.git"
+  },
+  "homepage": "https://github.com/rish-commits/yield#readme",
+  "bugs": {
+    "url": "https://github.com/rish-commits/yield/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "claude",
+    "claude code",
+    "context",
+    "memory",
+    "agent"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "yield.open",
+        "title": "Open",
+        "category": "Yield"
+      },
+      {
+        "command": "yield.installHooks",
+        "title": "Install hooks",
+        "category": "Yield"
+      }
+    ],
+    "configuration": {
+      "title": "Yield",
+      "properties": {
+        "yield.smartSuggestions": {
+          "type": "boolean",
+          "default": true,
+          "title": "Smart suggestions",
+          "markdownDescription": "Uses the Claude you already have. Nothing goes through us. Draws on your Claude usage.\nOff means scripted suggestions instead.",
+          "description": "Save notes while Claude Code works. They come back as project context on every later run."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "stage:whisper": "node scripts/stage-whisper.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.85.0",
+    "nodejs-whisper": "^0.3.1",
+    "typescript": "^5.5.0"
+  }
+}

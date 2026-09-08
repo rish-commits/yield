@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Yield — Conversational Flow (v1 blueprint)</title>
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0c11;--card:#0f131a;--card2:#12161f;
+    --line:rgba(255,255,255,.08);--line2:rgba(255,255,255,.13);
+    --fg:#e8e9ee;--dim:#9aa0ad;--faint:#5f6673;--ghost:#39404c;
+    --accent:#e8935c;--green:#6fae86;--blue:#7fa0c8;
+    --mono:'JetBrains Mono',ui-monospace,monospace;
+    --sans:'General Sans',-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.6;padding:48px 24px 80px}
+  .wrap{max-width:920px;margin:0 auto}
+  .eyebrow{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--faint);font-family:var(--mono)}
+  h1{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:8px 0 6px}
+  h1 .d{color:var(--accent)}
+  .sub{color:var(--dim);font-size:13.5px;max-width:660px}
+  h2{font-size:12px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin:48px 0 8px;display:flex;gap:12px;align-items:center;font-family:var(--mono)}
+  h2::after{content:"";flex:1;height:1px;background:var(--line)}
+  h2 .n{color:var(--ghost)}
+  .note{font-size:13px;color:var(--dim);margin:10px 0 16px;max-width:720px}
+  .principle{border:1px solid var(--line2);border-radius:14px;background:linear-gradient(160deg,rgba(232,147,92,.06),rgba(255,255,255,.01));padding:18px 20px;margin-top:22px}
+  .principle .k{font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin-bottom:7px;font-family:var(--mono)}
+  .principle p{font-size:14px;color:var(--fg)}
+  .principle b{color:#fff}
+  table{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px}
+  th{text-align:left;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:500;padding:10px 12px;border-bottom:1px solid var(--line2);vertical-align:bottom;font-family:var(--mono)}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--dim);vertical-align:top}
+  td b{color:var(--fg);font-weight:500}
+  tr:last-child td{border-bottom:none}
+  .trig{font-family:var(--mono);font-size:11.5px;color:var(--blue)}
+  .yq{color:var(--fg)}
+  .ya{color:var(--green);font-size:12.5px}
+  .flow{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:6px 4px}
+  .step{display:flex;gap:14px;padding:12px 16px;border-bottom:1px solid var(--line)}
+  .step:last-child{border-bottom:none}
+  .step .i{width:22px;height:22px;border-radius:6px;background:var(--card2);border:1px solid var(--line2);flex:none;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--dim);font-family:var(--mono)}
+  .step .b b{color:var(--fg)}
+  .step .b{font-size:13px;color:var(--dim)}
+  .rule{border-left:2px solid var(--accent);padding:3px 0 3px 16px;margin:12px 0;font-size:13px;color:var(--dim)}
+  .rule b{color:var(--fg)}
+  .bubble{display:inline-block;padding:8px 12px;border-radius:12px;font-size:13px;margin:3px 0;max-width:80%}
+  .bubble.y{background:var(--card2);border:1px solid var(--line);border-bottom-left-radius:4px;color:var(--fg)}
+  .bubble.u{background:rgba(232,147,92,.12);border:1px solid rgba(232,147,92,.25);border-bottom-right-radius:4px;color:var(--fg);float:right;clear:both}
+  .convo{display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:16px;max-width:440px;margin-top:8px}
+  .convo .row{display:flex}.convo .row.r{justify-content:flex-end}
+  .future{border:1px dashed var(--line2);border-radius:12px;padding:14px 16px;margin-top:10px;background:rgba(127,160,200,.04)}
+  .future .k{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--blue);font-family:var(--mono);margin-bottom:6px}
+  .future li{font-size:12.5px;color:var(--dim);margin:3px 0 3px 16px}
+  .foot{margin-top:52px;padding-top:16px;border-top:1px solid var(--line);font-size:11px;color:var(--ghost);font-family:var(--mono)}
+  code{font-family:var(--mono);font-size:12px;background:rgba(255,255,255,.05);padding:1px 5px;border-radius:4px;color:var(--fg)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Yield · conversational flow</div>
+  <h1>Scripted Flow<span class="d">.</span> <span style="font-size:14px;color:var(--faint);font-weight:400">v1 blueprint</span></h1>
+  <p class="sub">Turns the input from a blank box into a two-way exchange: Yield asks, the user answers or free-types, Yield acknowledges and saves. Scripted for v1 (instant, reliable); built so an LLM can replace the script later without changing the UI.</p>
+
+  <div class="principle">
+    <div class="k">Core principle</div>
+    <p><b>Bidirectional, never a gate.</b> Yield offers a question; the user can answer it, skip it, or ignore it and free-type. The free-type box is always live. Yield <b>reacts</b> to what it gets (a short acknowledgment) so the exchange feels alive, but it never blocks input, never nags, and stays silent when it has nothing worth asking.</p>
+  </div>
+
+  <h2><span class="n">01</span> Scope (v1)</h2>
+  <table>
+    <tr><th>In</th><th>Deferred (logged)</th></tr>
+    <tr>
+      <td><b>Global</b> context (not per-project)<br><b>Scripted</b> questions + acknowledgments<br>Two states: <b>first-time</b> / <b>returning</b><br>Contextual questions from prompt keywords<br>Free-type always available</td>
+      <td>LLM-generated replies (Level 2a)<br>File-based project detection (Level 2b)<br>Deep codebase analysis (Level 2c)<br>Per-project context &amp; history<br>New-project / long-gap / answered-all states</td>
+    </tr>
+  </table>
+
+  <h2><span class="n">02</span> The two states</h2>
+  <table>
+    <tr><th>State</th><th>Behavior</th></tr>
+    <tr><td><b>First-time</b></td><td>Brief intro (one line: what Yield is), then eases into the first question. Higher guidance. This is the onboarding moment.</td></tr>
+    <tr><td><b>Returning</b></td><td>No intro. Straight to a question (contextual if the current task matches, else a single soft opener, else silent).</td></tr>
+  </table>
+
+  <h2><span class="n">03</span> The core loop</h2>
+  <div class="flow">
+    <div class="step"><div class="i">1</div><div class="b"><b>Trigger.</b> A task starts (or panel opens). Yield checks the current prompt for a keyword match.</div></div>
+    <div class="step"><div class="i">2</div><div class="b"><b>Ask.</b> Match → contextual question. No match → one soft general opener (returning) or intro+opener (first-time). Nothing good to ask → stay silent, show input only.</div></div>
+    <div class="step"><div class="i">3</div><div class="b"><b>User responds.</b> Answers the question, taps skip, or free-types something else. All three are valid.</div></div>
+    <div class="step"><div class="i">4</div><div class="b"><b>Acknowledge + save.</b> Yield gives a short reply, writes the note to <code>yield-context.md</code>, bumps the note count.</div></div>
+    <div class="step"><div class="i">5</div><div class="b"><b>Continue or rest.</b> At most one gentle follow-up if the user engaged. Then Yield backs off to the resting input. Never a barrage.</div></div>
+  </div>
+
+  <h2><span class="n">04</span> Question &amp; acknowledgment scripts</h2>
+  <p class="note">Keyword in the current prompt → Yield's question → short acknowledgment after the user answers. Kept as data so an LLM can later generate these instead. Acknowledgments rotate so they don't feel canned.</p>
+  <table>
+    <tr><th>If prompt mentions…</th><th>Yield asks</th><th>Then acknowledges</th></tr>
+    <tr><td><span class="trig">auth, login, session</span></td><td class="yq">Any auth patterns or libraries Claude should stick to?</td><td class="ya">Noted. I'll keep that in mind for anything auth-related.</td></tr>
+    <tr><td><span class="trig">db, schema, migration, table, query</span></td><td class="yq">Any conventions for how tables or queries should be written?</td><td class="ya">Got it, saved.</td></tr>
+    <tr><td><span class="trig">api, endpoint, route</span></td><td class="yq">Any API conventions Claude should follow?</td><td class="ya">Saved. That'll shape how it builds endpoints.</td></tr>
+    <tr><td><span class="trig">deploy, build, ci, release</span></td><td class="yq">Where does this deploy, and any gotchas to know?</td><td class="ya">Noted for future runs.</td></tr>
+    <tr><td><span class="trig">test, spec, e2e</span></td><td class="yq">How do you want tests written, and anything to skip?</td><td class="ya">Got it.</td></tr>
+    <tr><td><span class="trig">style, css, ui, component, design</span></td><td class="yq">Any design system or styling rules to follow?</td><td class="ya">Saved. It'll respect that going forward.</td></tr>
+    <tr><td><span class="trig">refactor, cleanup, migrate</span></td><td class="yq">Anything Claude should avoid changing while it refactors?</td><td class="ya">Noted, it'll steer clear of that.</td></tr>
+    <tr><td><span class="trig">(no match → soft opener)</span></td><td class="yq">Anything Claude should know before it digs in?</td><td class="ya">Got it, saved.</td></tr>
+  </table>
+
+  <h2><span class="n">05</span> First-time intro copy</h2>
+  <div class="convo">
+    <div class="row"><span class="bubble y">Hey — I'm Yield. While your agent works, tell me anything it should know and I'll remember it for every run.</span></div>
+    <div class="row"><span class="bubble y">To start: anything it should keep in mind on this project?</span></div>
+    <div class="row r"><span class="bubble u">use pnpm, and don't touch the /legacy folder</span></div>
+    <div class="row"><span class="bubble y">Noted. That's saved — I'll bring it into future runs.</span></div>
+  </div>
+  <p class="note" style="margin-top:12px">Intro is <b>one</b> short self-introduction, then straight into the first question. Shown once, ever. After the first answer, the user is "returning" from then on.</p>
+
+  <h2><span class="n">06</span> The four safety behaviors</h2>
+  <div class="rule"><b>Nothing relevant to ask →</b> Yield stays silent and shows only the resting input. It never invents a filler question. Silence is a feature.</div>
+  <div class="rule"><b>User skips / ignores →</b> if the last 2–3 questions were skipped or ignored, Yield stops offering questions for this session and just shows the input. It reads the room.</div>
+  <div class="rule"><b>User free-types instead of answering →</b> the typed note is accepted and saved normally, with a neutral acknowledgment. Yield does <b>not</b> repeat or re-ask its question, and doesn't act like the user "missed" it.</div>
+  <div class="rule"><b>Interrupted mid-answer (task ends) →</b> the draft is preserved (per the state model). The exchange pauses, nothing is lost, the note simply targets the next run.</div>
+
+  <h2><span class="n">07</span> Volume &amp; tone rules</h2>
+  <div class="rule"><b>One question per wait</b> by default. One gentle follow-up only if the user actively answered. Never a chain of 3+.</div>
+  <div class="rule"><b>Tone:</b> calm, warm, brief. Acknowledgments are 3–8 words. No peppy chatbot energy, no emoji spam, no exclamation overload. It sounds like a thoughtful colleague, not a mascot.</div>
+  <div class="rule"><b>Yield speaks only when useful.</b> A quiet panel is better than a chatty one. The goal is a helpful nudge, not a conversation partner that won't stop.</div>
+
+  <h2><span class="n">08</span> Built for the LLM upgrade</h2>
+  <div class="future">
+    <div class="k">Future pipeline — do not lose</div>
+    <ul>
+      <li><b>2a — LLM replies:</b> swap the scripted question/ack lookup for a free/local model (Gemini Flash, Groq, OpenRouter) or the Claude Code agent itself. Not paid. Blocker is latency — layer it so it falls back to scripts when slow.</li>
+      <li><b>2b — File-based project detection:</b> read package.json / lockfiles / configs to detect the real stack — project-aware questions. No AI, no cost, low latency. Likely the next thing after v1.</li>
+      <li><b>2c — Deep codebase analysis:</b> summarize a large repo for bespoke questions. The heavy one (big repos, caching, freshness). Later.</li>
+    </ul>
+  </div>
+  <p class="note" style="margin-top:12px"><b>Design constraint that makes the upgrade cheap:</b> questions and acknowledgments live in a data structure (trigger → question → ack). The loop and UI read from that structure. Level 2a just replaces "pick from the list" with "ask the model" — no UI or flow rewrite.</p>
+
+  <div class="foot">Yield — conversational flow · v1 (scripted) · behavior spec for build. LLM path logged in §08, sequenced not dropped.</div>
+</div>
+</body>
+</html>

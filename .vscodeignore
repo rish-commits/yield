@@ -1,0 +1,16 @@
+.vscode/**
+.claude/**
+src/**
+node_modules/**
+tsconfig.json
+**/*.map
+**/*.ts
+CLAUDE.md
+design/**
+.yield/**
+scratchpad/**
+scripts/**
+bin/whisper/**
+.gitignore
+.gitattributes
+.git/**

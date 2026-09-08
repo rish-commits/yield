@@ -1,0 +1,316 @@
+/* ============================================================================
+   Yield panel — visual source of truth: yield-panel-mock-v77.html
+   Tokens are YIELD-BUILD-HANDOFF.md §1, reproduced exactly. Do not drift.
+   Phase A ships the whole stylesheet (including chat/motion rules that nothing
+   uses yet) so Phases B–D only add behaviour, never re-port the design.
+   ========================================================================== */
+
+/* Geist + Geist Mono, self-hosted (SIL OFL 1.1 — see fonts/LICENSE-geist.txt).
+   Variable files: one woff2 per subset covers the whole 100–900 range. */
+@font-face{
+  font-family:'Geist';font-style:normal;font-display:swap;font-weight:100 900;
+  src:url(./fonts/geist-latin.woff2) format('woff2-variations');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face{
+  font-family:'Geist';font-style:normal;font-display:swap;font-weight:100 900;
+  src:url(./fonts/geist-latin-ext.woff2) format('woff2-variations');
+  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+@font-face{
+  font-family:'Geist Mono';font-style:normal;font-display:swap;font-weight:100 900;
+  src:url(./fonts/geist-mono-latin.woff2) format('woff2-variations');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+@font-face{
+  font-family:'Geist Mono';font-style:normal;font-display:swap;font-weight:100 900;
+  src:url(./fonts/geist-mono-latin-ext.woff2) format('woff2-variations');
+  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+:root{
+  /* spacing — 8pt grid */
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s8:32px;--s10:40px;
+  /* type scale */
+  --t-xs:11px;--t-sm:12px;--t-base:12.5px;--t-md:13.5px;--t-lg:19px;
+  /* colour — LIGHT mode (follow-editor-theme is still an open decision, §10) */
+  /* --card is now the single panel surface. --bg is the mock's old backdrop,
+     kept only so a dark set has the slot. --muted must stay distinct from the
+     surface or the assistant bubbles vanish into it. */
+  --bg:#f4f4f5;--card:#fff;--muted:#f4f4f5;--muted-2:#e4e4e7;
+  --border:rgba(0,0,0,.08);--border-2:rgba(0,0,0,.13);
+  --fg:#18181b;--mfg:#52525b;--mfg-2:#a1a1aa;--ring:rgba(0,0,0,.22);--green:#22c55e;
+  /* families */
+  --sans:'Geist','Geist Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'Geist Mono',ui-monospace,monospace;
+  --geist:'Geist','Geist Sans',-apple-system,sans-serif;
+
+  /* MOTION. Three curves, by intent — nothing in the panel should be on the
+     browser's default `ease`, which is what 19 of these transitions were using.
+     --ease-out  things ARRIVING: a hard start that settles long and soft, so an
+                 entrance reads as expressive rather than mechanical.
+     --ease-move things TRAVELLING between two states: symmetric, no overshoot.
+     --ease-ui   small state changes (hover, colour, opacity): quick out, so the
+                 panel answers the cursor immediately instead of easing in. */
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-move:cubic-bezier(.4,0,.2,1);
+  --ease-ui:cubic-bezier(.33,1,.68,1);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--card);font-family:var(--sans);color:var(--fg);
+  display:flex;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+
+/* THE PANEL IS THE SURFACE. The mock's floating card needed a backdrop to show
+   its shape; a docked panel does not — a second surface inside it just reads as
+   something marooned in grey. So: no outer margin or centering, no border,
+   radius or shadow, and no separate card background. The body carries the one
+   surface colour and the card fills the panel edge to edge.
+   Breathing room is the sections' own 24px insets, on that same surface.
+   KNOWN, deferred: below ~400px wide the two-line placeholder wraps to three
+   lines and clips against the 64px min-height, and the status chip wraps. */
+.card{
+  width:100%;height:100%;
+  display:flex;flex-direction:column;
+}
+
+/* ---------------------------------------------------------------- top bar */
+.cardtop{position:relative;display:flex;align-items:center;gap:var(--s1);height:48px;padding:0 var(--s3)}
+/* Quiet persistent branding, absolutely centred so the chip's width (Idle vs
+   "Agent is working") never shifts it off centre. Never intercepts clicks. */
+.brand{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:block;height:15px;width:55px;pointer-events:none;user-select:none}
+.iconbtn{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--mfg-2);cursor:pointer;transition:.15s var(--ease-ui);background:none;border:none}
+.iconbtn:hover{background:var(--muted);color:var(--mfg)}
+.iconbtn svg{width:16px;height:16px}
+/* A readout, not a control: the hooks own this state, so nothing here should
+   invite a click. (The mock's chip was a hand-toggle for demoing WORKING.) */
+.statuschip{display:flex;align-items:center;gap:var(--s2);font-size:var(--t-sm);line-height:1.3;color:var(--mfg);padding:var(--s1) var(--s3) var(--s1) var(--s2);border-radius:999px;margin-right:auto;transition:.15s var(--ease-ui);font-family:var(--sans);user-select:none}
+.sdot{width:7px;height:7px;border-radius:50%;background:#d4d4d8;transition:.3s var(--ease-move);flex:none}
+.card.working .sdot{background:var(--green);box-shadow:0 0 8px rgba(34,197,94,.45)}
+/* Cannot hear the agent: a hollow dot, so it reads as "not connected" rather
+   than as a state the agent is in. No new colour — the ring is the existing
+   muted foreground. Deliberately quiet: notes still save, nothing is blocked. */
+.card.deaf .sdot{background:transparent;box-shadow:inset 0 0 0 1.5px var(--mfg-2)}
+.card.deaf.working .sdot{background:transparent;box-shadow:inset 0 0 0 1.5px var(--mfg-2)}
+
+/* ------------------------------------------------------- mark + headlines */
+/* EMPTY STATE: the welcome sits centred in the space between the header and
+   the composer — auto margins top AND bottom split the slack evenly. */
+.centre{display:flex;flex-direction:column;align-items:center;text-align:center;padding:var(--s2) 0 0;margin-top:auto;margin-bottom:auto}
+/* ACTIVE STATE: once messages exist the welcome stops floating; all the slack
+   collects above it so the stack anchors to the bottom and rises out of the
+   composer. `chatting` is set by the webview the moment the stream wakes. */
+.card.chatting .centre{margin-bottom:0}
+.markwrap{position:relative;width:52px;height:52px;border-radius:13px;overflow:hidden;box-shadow:0 4px 14px rgba(10,13,18,.28)}
+.markwrap .mark{width:52px;height:52px;border-radius:13px;display:block}
+.markwrap::after{content:"";position:absolute;top:-60%;left:-30%;width:40%;height:220%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);transform:rotate(18deg);pointer-events:none;animation:marksheen 6s ease-in-out infinite}
+@keyframes marksheen{0%{left:-40%}22%{left:130%}100%{left:130%}}
+
+.greet{margin-top:var(--s4)}
+.greet .h1{font-family:var(--geist);font-size:var(--t-lg);font-weight:600;line-height:1.25;color:var(--fg);letter-spacing:-.02em}
+.ydplain{font-weight:inherit}
+.greet .h2{font-family:var(--geist);font-size:var(--t-md);font-weight:500;line-height:1.3;letter-spacing:-.01em;color:var(--mfg);margin-top:var(--s1)}
+.greet p{font-family:var(--mono);font-size:11.5px;line-height:1.55;color:var(--mfg);margin-top:var(--s3);max-width:310px;letter-spacing:-.01em}
+.greet p .m{font-family:var(--mono);font-size:var(--t-sm);color:var(--fg);background:rgba(0,0,0,.06);border:1px solid rgba(0,0,0,.045);border-radius:5px;padding:1px 6px;white-space:nowrap}
+/* teaching copy: shown cold + with-context, hidden once they know the mechanism */
+.card.returning .greet p{display:none}
+
+/* ---------------------------------------------------------------- the chat */
+/* No bottom auto-margin: the composition is BOTTOM-anchored. Yield is an input
+   tool, so the composer and footer belong at the bottom edge where the cursor
+   lives, with the rolling stack rising out of them. All slack collects above
+   the logo as top breathing room (see .centre's margin-top:auto). */
+.chat{margin-top:var(--s4);display:flex;flex-direction:column;flex:1;min-height:0}
+/* Exists only so the pill has something to anchor to: the stream itself cannot
+   be the containing block, because its own scrolling would carry the pill away. */
+.streamwrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+
+/* ONE scrollable column holding the header and every message. It takes all the
+   height the composer and footer leave, and it is the only thing that scrolls.
+   The bottom fade is permanent; the TOP fade only appears once you have
+   scrolled, so the opening state shows the logo and headlines undimmed exactly
+   as before. */
+.stream{
+  position:relative;flex:1;min-height:0;padding:0 var(--s6);
+  overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 26px),transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 0,#000 calc(100% - 26px),transparent 100%);
+}
+.stream.scrolled{
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 26px,#000 calc(100% - 26px),transparent 100%);
+  mask-image:linear-gradient(to bottom,transparent 0,#000 26px,#000 calc(100% - 26px),transparent 100%);
+}
+.stream::-webkit-scrollbar{display:none}
+.stream .inner{position:relative;display:flex;flex-direction:column;gap:var(--s2);min-height:100%;padding:6px 0 26px}
+/* Bottom padding clears the mask's 26px bottom fade, so the NEWEST message —
+   the one you actually want to read — stays crisp while history still
+   dissolves at both edges when you scroll back through it.
+   Bottom-anchored by auto margin, NOT justify-content:flex-end as in v77: with
+   real overflow, flex-end pushes the top of the stack outside the scrollable
+   area and history becomes unreachable. Same look, actually scrollable. */
+.msg{display:flex;gap:var(--s2);max-width:100%;
+  animation:msgin .5s var(--ease-out)}
+.msg.user{flex-direction:row-reverse}
+/* The dissolve is SCROLL-BOUND, not an exit animation: panel.js writes blur and
+   opacity from each item's distance to the top edge, so content softens as it
+   passes out of view instead of animating out of existence. Same language as
+   the old fadeup, driven by scroll. No transition — it must track the finger. */
+.msg .av{width:22px;height:22px;border-radius:6px;flex:none;overflow:hidden;box-shadow:0 1px 3px rgba(10,13,18,.22)}
+.msg .av img{width:100%;height:100%;display:block}
+.msg.assistant .body{background:var(--muted);color:var(--fg);padding:8px 11px;border-radius:12px;border-top-left-radius:4px;max-width:84%;font-size:var(--t-base);line-height:1.45}
+.msg.user .body{background:#18181b;color:#fafafa;padding:8px 11px;border-radius:12px;border-top-right-radius:4px;max-width:84%;font-size:var(--t-base);line-height:1.45}
+@keyframes msgin{from{opacity:0;transform:translateY(10px);filter:blur(3px)}to{opacity:1;transform:none;filter:blur(0)}}
+.msg.entering{animation:msgin .55s var(--ease-out)}
+.msg.assistant .body.typing::after{content:'';display:inline-block;width:2px;height:1em;background:var(--mfg);margin-left:1px;vertical-align:-2px;animation:caret .8s steps(1) infinite}
+@keyframes caret{0%,50%{opacity:1}50.01%,100%{opacity:0}}
+
+/* Setup line. Sits where the chat does, in the descriptor's mono voice so it
+   reads as the panel talking about itself rather than as a message. Only ever
+   present for a state the user has to act on. */
+.setupnote{flex:none;margin:0 var(--s6);padding:var(--s2) 0 0;text-align:center;
+  font-family:var(--mono);font-size:11.5px;line-height:1.55;letter-spacing:-.01em;
+  color:var(--mfg);animation:msgin .45s var(--ease-out)}
+.setupnote[hidden]{display:none}
+
+/* New-message pill. Floats over the bottom of the chat, in the send button's
+   exact weights and the status chip's pill radius — no new colour, no new
+   radius. Only ever visible when you are away from the bottom AND something
+   arrived. */
+.newmsg{position:absolute;left:50%;bottom:10px;z-index:2;
+  transform:translateX(-50%);display:flex;align-items:center;gap:6px;
+  height:26px;padding:0 10px 0 12px;border:none;border-radius:999px;
+  background:#27272a;color:#fafafa;cursor:pointer;
+  font-family:var(--sans);font-size:var(--t-sm);line-height:1;
+  box-shadow:0 2px 10px rgba(10,13,18,.22);
+  animation:msgin .35s var(--ease-out)}
+.newmsg:hover{background:#3f3f46}
+.newmsg svg{width:12px;height:12px}
+.newmsg[hidden]{display:none}
+
+/* question rows — minimal (return glyph + one line + divider), never chips */
+.qopts{display:flex;flex-direction:column;padding:0 var(--s6);margin-top:var(--s2)}
+.qopts.hide{display:none}
+.card.coldstart .qopts{display:none}
+.qopt{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;
+  border-top:1px solid var(--border);padding:10px 2px;cursor:pointer;transition:.15s var(--ease-ui);font-family:var(--sans)}
+.qopt:first-child{border-top:none}
+.qopt .qret{flex:none;color:var(--mfg-2);display:flex;transition:.15s var(--ease-ui)}
+.qopt .qret svg{width:12px;height:12px}
+.qopt:hover .qret{color:var(--fg)}
+.qopt .qt{flex:1;min-width:0;font-size:11px;color:var(--fg);line-height:1.3;transition:color .15s var(--ease-ui);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qopt:hover .qt{color:#000}
+
+/* --------------------------------------------------------------- composer */
+.composer{margin:var(--s4) var(--s6) 0;position:relative;background:var(--card);border:1px solid var(--border);border-radius:13px;transition:border-color .22s var(--ease-out),background-color .22s var(--ease-out),box-shadow .15s;overflow:hidden}
+.card.coldstart .composer textarea{min-height:84px}
+.composer:focus-within{border-color:var(--ring);box-shadow:0 0 0 3px rgba(0,0,0,.05)}
+.composer textarea{display:block;width:100%;min-height:64px;max-height:120px;resize:none;background:transparent;border:none;outline:none;padding:12px 76px 12px 14px;font-family:var(--geist);font-size:var(--t-base);color:var(--fg);line-height:1.5;transition:opacity .18s var(--ease-ui)}
+.composer textarea::placeholder{color:var(--mfg-2);line-height:1.5}
+.cbtns{position:absolute;right:7px;top:6px;display:flex;align-items:center;gap:4px;transition:opacity .18s var(--ease-ui)}
+.micbtn{width:32px;height:32px;border-radius:8px;border:none;background:none;display:flex;align-items:center;justify-content:center;color:var(--mfg-2);cursor:pointer;transition:.15s var(--ease-ui)}
+.micbtn:hover{color:var(--fg);background:var(--muted)}
+/* Voice is spec'd but not in v1. Reads as unavailable rather than as a control
+   that silently does nothing. */
+.micbtn:disabled{opacity:.35;cursor:default}
+.micbtn:disabled:hover{color:var(--mfg-2);background:none}
+.micbtn svg{width:16px;height:16px}
+.sendbtn{width:32px;height:32px;border-radius:8px;border:none;background:#27272a;color:#fafafa;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--ease-ui)}
+.sendbtn:hover{background:#3f3f46}
+.sendbtn svg{width:15px;height:15px}
+.sendbtn:disabled{background:#e4e4e7;color:#a1a1aa;cursor:default}
+
+/* VOICE OFF (VOICE_ENABLED=false in src/whisper.ts). The card carries
+   `no-voice` from the first server-painted frame, so the mic never flashes
+   before the webview removes the node itself. With one button instead of two,
+   the composer's right padding is resized to match: the button column is
+   7px(right) + 32px = 39px, so 40px keeps the same 1px of breathing room the
+   two-button layout had at 76px. Without this the text measure would stop 36px
+   early for no reason. */
+.card.no-voice .micbtn{display:none}
+.card.no-voice .composer textarea{padding-right:40px}
+
+/* ------------------------------------------------------------------- voice */
+/* v78. Every voice state lives INSIDE the composer — no new surfaces, no
+   resizing, nothing that shifts the layout underneath. Same footprint, same
+   13px radius throughout. */
+
+/* RECORDING: the surface recedes to --muted at unchanged border weight, so only
+   the stop action carries weight. Same footprint, same 13px radius. */
+.composer.voice{background:var(--muted);border-color:var(--border);box-shadow:none}
+.composer.voice textarea{opacity:0;pointer-events:none}
+.composer.voice .cbtns{opacity:0;pointer-events:none}
+
+.voicebar{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;gap:var(--s2);
+  padding:0 8px 0 14px;opacity:0;pointer-events:none;transition:opacity .2s var(--ease-out)}
+.composer.voice .voicebar{opacity:1;pointer-events:auto}
+.vstate{font-family:var(--mono);font-size:var(--t-sm);color:var(--mfg);flex:none;
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
+
+/* Mirrored bars: flex + align-items:center means each bar grows up AND down
+   from the centreline, which is what makes it read as a waveform not an eq. */
+.wave{flex:1;align-self:stretch;display:flex;align-items:center;justify-content:center;gap:2.5px;min-width:0}
+.wave i{display:block;width:2px;height:2px;border-radius:1px;background:var(--fg);opacity:.3;
+  transition:height .07s linear,opacity .07s linear}
+
+/* TRANSCRIBING: bars settle, then a slow pulse travels through them left to
+   right. Work is happening; the panel should not look finished. */
+.composer.settled .wave i{height:2px;opacity:.28;transition:height .35s var(--ease-out),opacity .35s;
+  animation:scan 1.9s var(--ease-move) infinite;animation-delay:calc(var(--i) * .052s)}
+@keyframes scan{
+  0%,62%{height:2px;opacity:.26}
+  14%{height:9px;opacity:.78}
+  30%{height:3px;opacity:.34}
+  100%{height:2px;opacity:.26}
+}
+
+.vstop{width:32px;height:32px;border-radius:8px;flex:none;border:none;background:#27272a;
+  color:#fafafa;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--ease-ui)}
+.vstop:hover{background:#3f3f46}
+.vstop svg{width:13px;height:13px}
+.vstop:disabled{background:#e4e4e7;color:#a1a1aa;opacity:1;cursor:default}
+
+/* NOTICE: model download, first-run prepare, failure. Composer stays light —
+   nothing is being recorded, so it must not wear the recording surface. */
+.cnotice{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;gap:var(--s2);
+  padding:0 10px 0 14px;opacity:0;pointer-events:none;transition:opacity .2s var(--ease-ui)}
+.composer.notice .cnotice{opacity:1;pointer-events:auto}
+.composer.notice textarea{opacity:0;pointer-events:none}
+.composer.notice .cbtns{opacity:0;pointer-events:none}
+.cnotice .nt{font-family:var(--mono);font-size:var(--t-sm);color:var(--mfg);flex:1;min-width:0;
+  line-height:1.35;letter-spacing:-.01em}
+.cnotice .nt b{font-weight:400;color:var(--fg)}
+.retry{height:26px;padding:0 10px;border-radius:8px;border:1px solid var(--border-2);background:var(--card);
+  font-family:var(--sans);font-size:var(--t-sm);color:var(--fg);cursor:pointer;transition:.15s var(--ease-ui);flex:none}
+.retry:hover{background:var(--muted)}
+.cprog{position:absolute;left:0;bottom:0;height:2px;background:var(--fg);width:0;transition:width .25s linear;opacity:.55}
+.composer.indet .cprog{width:32%;animation:indet 1.35s var(--ease-move) infinite}
+@keyframes indet{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+
+/* ----------------------------------------------------------------- footer */
+.chatfoot{display:flex;align-items:center;margin:var(--s3) var(--s6) var(--s5)}
+.ctxbtn{display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;border-radius:7px;font-size:var(--t-sm);line-height:1;color:var(--mfg-2);background:none;border:none;cursor:pointer;transition:.15s var(--ease-ui);font-family:var(--mono)}
+.ctxbtn:hover{color:var(--fg);background:var(--muted)}
+.ctxbtn svg{width:13px;height:13px}
+.ctxbtn.saved #ctxlabel{color:var(--green)}
+.ctxbtn #ctxlabel{transition:color .3s var(--ease-ui)}
+
+@media (prefers-reduced-motion:reduce){
+  .markwrap::after{animation:none;opacity:0}
+  .msg,.stream .inner{animation:none;transition:none}
+  .stream{scroll-behavior:auto}
+  /* The waveform still tracks real amplitude — it is information, not
+     decoration — but the indeterminate sweep stops travelling and the scan
+     pulse slows well below the flash threshold. */
+  .composer.indet .cprog{animation:none;width:100%}
+  .wave i{transition:none}
+  .composer.settled .wave i{animation-duration:3.4s}
+  .msg{animation:none}
+  .newmsg{animation:none}
+  .setupnote{animation:none}
+  .stream{scroll-behavior:auto}
+}
