@@ -28,12 +28,18 @@ If Claude Code was already running when you installed, the panel shows one line
 asking you to restart it, because hooks are read once when a session starts.
 That line disappears the moment it works and does not come back.
 
+Open a folder before you start. Yield keeps your notes beside the project, so
+with no folder open there is nowhere to put them: the panel says so and saving
+is refused rather than silently dropped. Everywhere else, notes save whatever
+else has gone wrong.
+
 Works in VS Code 1.85 or later, and in forks such as Cursor.
 
 ## Install
 
-Open the Extensions view (`Cmd+Shift+X`), search for **Yield**, and click
-**Install**. Reload the window, then `Cmd+Shift+P` and pick **Yield: Open**.
+Open the Extensions view (`Ctrl+Shift+X`, or `Cmd+Shift+X` on macOS), search
+for **Yield**, and click **Install**. Reload the window, then `Ctrl+Shift+P`
+(`Cmd+Shift+P` on macOS) and pick **Yield: Open**.
 
 <details>
 <summary>Building from source instead</summary>
@@ -124,8 +130,8 @@ immediately with no reload.
 
 ## Using it
 
-`Cmd+Shift+P` and pick **Yield: Open**. The panel opens as an ordinary editor
-tab, so you can drag it wherever you like.
+`Ctrl+Shift+P` (`Cmd+Shift+P` on macOS) and pick **Yield: Open**. The panel
+opens as an ordinary editor tab, so you can drag it wherever you like.
 
 - The dot goes green while your agent is working
 - Type anything and press Enter to save it
@@ -147,7 +153,7 @@ before the hooks existed is not sending them.
 
 **Something went wrong during setup.** The panel says what, in one line, and the
 Output channel ("Yield") carries the path to the settings file. To retry, run
-`Cmd+Shift+P` and pick **Yield: Install hooks**.
+`Ctrl+Shift+P` (`Cmd+Shift+P` on macOS) and pick **Yield: Install hooks**.
 
 ## Development
 

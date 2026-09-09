@@ -99,6 +99,46 @@ export type GenerateOptions = {
   env?: NodeJS.ProcessEnv;
 };
 
+/** Quote one argument the way CommandLineToArgvW will read it back out. */
+function winQuote(arg: string): string {
+  return `"${arg.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, '$1$1')}"`;
+}
+
+/** ...then caret what cmd.exe would otherwise treat as syntax rather than text. */
+function cmdEscape(arg: string): string {
+  return winQuote(arg).replace(/[()%!^"<>&|]/g, '^$&');
+}
+
+/**
+ * How to launch a resolved CLI path on this platform.
+ *
+ * CreateProcess CANNOT execute a .cmd/.bat, and the npm install of Claude Code
+ * on Windows is exactly that — a `claude.cmd` shim. That is the whole reason a
+ * bare `spawn('claude')` fails there. A shim has to go through cmd.exe, but
+ * `shell: true` would hand cmd.exe a line containing the PROMPT — raw user
+ * text plus the entire context file — so one `&` or `"` in someone's note
+ * would become a command. Instead every argument is escaped for both
+ * CommandLineToArgvW and cmd.exe, and passed verbatim so Node does not quote
+ * it a second time.
+ *
+ * Everything else is spawned directly with no shell at all: every POSIX
+ * binary, and `claude.exe` on Windows. That path is unchanged.
+ */
+export function launchSpec(
+  bin: string,
+  args: string[],
+  platform: NodeJS.Platform = process.platform
+): { file: string; args: string[]; verbatim: boolean } {
+  const isShim = platform === 'win32' && /\.(cmd|bat)$/i.test(bin);
+  if (!isShim) { return { file: bin, args, verbatim: false }; }
+  const line = [bin, ...args].map(cmdEscape).join(' ');
+  return {
+    file: process.env.ComSpec || 'cmd.exe',
+    args: ['/d', '/s', '/c', `"${line}"`],
+    verbatim: true
+  };
+}
+
 /**
  * One model call. Returns the raw text, or a failure — the caller decides what
  * `NONE` means, because "nothing to ask" and "could not ask" are different
@@ -119,14 +159,19 @@ export function runClaude(opts: GenerateOptions): Promise<{ ok: true; text: stri
     let child;
     try {
       // YIELD_CLAUDE_BIN lets someone point at a CLI that is not on PATH, and
-      // is the seam the tests use to stand in a stub for the real thing.
-      const bin = opts.binary ?? process.env.YIELD_CLAUDE_BIN ?? 'claude';
-      child = spawn(bin, args, {
+      // is the seam the tests use to stand in a stub for the real thing. It
+      // OUTRANKS opts.binary: that one is whatever findClaude() detected, and
+      // an explicit override the user set must beat auto-detection, not lose
+      // to it.
+      const bin = process.env.YIELD_CLAUDE_BIN ?? opts.binary ?? 'claude';
+      const spec = launchSpec(bin, args);
+      child = spawn(spec.file, spec.args, {
         cwd: opts.cwd,
         env: opts.env ?? spawnEnv(),
         // stdin closed immediately: the CLI otherwise waits 3s for input that
         // never comes, which was pure dead time in the spike.
-        stdio: ['ignore', 'pipe', 'pipe']
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsVerbatimArguments: spec.verbatim
       });
     } catch (err) {
       resolve({ ok: false, reason: `could not start: ${(err as Error).message}` });
@@ -216,15 +261,37 @@ export function nextPhrasing(): { opening: string; ending: string } {
   };
 }
 
-export function buildSystemPrompt(opening: string, ending: string): string {
+export function buildSystemPrompt(
+  opening: string,
+  ending: string,
+  mode: 'task' | 'note' = 'task'
+): string {
+  // The ONLY difference between the modes is what the gap must be relevant TO.
+  // Everything below it — the three-part shape, the word budget, the bans — is
+  // shared, because the tone is locked and a second voice would show.
+  const framing = mode === 'note'
+    ? [
+      'A developer just wrote a note into their project context file. You offer them ONE',
+      'line suggesting what would make that note more useful.',
+      '',
+      'You are given their note, the task they are on, and the current context file.',
+      '',
+      'GO DEEPER ON WHAT THEY JUST WROTE. The gap you name must be about THAT subject —',
+      'the natural next detail someone reading their note would still not know. Do NOT',
+      'change the subject to another area of the project, however useful that would be.',
+      'Never suggest something their note or the file already says.'
+    ]
+    : [
+      'A developer just sent a task to their coding agent. While it works, you offer them ONE',
+      'line suggesting something worth adding to their project context file.',
+      '',
+      'You are given the task and the current context file.',
+      '',
+      'Offer a SPECIFIC gap the file does not already cover, relevant to what they are working',
+      'on. Never suggest something the file already says.'
+    ];
   return [
-    'A developer just sent a task to their coding agent. While it works, you offer them ONE',
-    'line suggesting something worth adding to their project context file.',
-    '',
-    'You are given the task and the current context file.',
-    '',
-    'Offer a SPECIFIC gap the file does not already cover, relevant to what they are working',
-    'on. Never suggest something the file already says.',
+    ...framing,
     '',
     'THE LINE HAS EXACTLY THREE PARTS:',
     `  1. the words: ${opening}`,
@@ -244,12 +311,14 @@ export function buildSystemPrompt(opening: string, ending: string): string {
     'No parentheses. No lists. No examples of tools. At most ONE hedge such as "if useful".',
     'One line. No quotes, no preamble, no markdown, no bullet.',
     '',
-    'If the file already covers everything relevant to this task, output exactly NONE.'
+    mode === 'note'
+      ? 'If their note already says everything useful about that subject, output exactly NONE.'
+      : 'If the file already covers everything relevant to this task, output exactly NONE.'
   ].join('\n');
 }
 
-export function buildUserPrompt(task: string, store: string): string {
-  return [
+export function buildUserPrompt(task: string, store: string, note?: string): string {
+  const lines = [
     'CURRENT CONTEXT FILE:',
     '"""',
     store.trim() || '(empty)',
@@ -259,7 +328,35 @@ export function buildUserPrompt(task: string, store: string): string {
     '"""',
     task.trim(),
     '"""'
-  ].join('\n');
+  ];
+  // LAST and labelled loudest: it is the thing being responded to. Placing it
+  // above the task invited suggestions about the task instead.
+  if (note && note.trim()) {
+    lines.push('', 'THE NOTE THEY JUST WROTE — RESPOND TO THIS:', '"""', note.trim(), '"""');
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Obvious keyboard mash, and nothing else.
+ *
+ * DELIBERATELY TOO CAUTIOUS. A wrong "this is gibberish" verdict on a real note
+ * is far worse than one unnecessary suggestion, so every rule here is a reason
+ * to say NO:
+ *  - any whitespace at all -> real. Mash is one blurt.
+ *  - under 5 characters -> real, so `idk`, `npm`, `TS`, `CI` can never be mash.
+ *  - `y` counts as a vowel, so `rhythm`, `myths`, `crypt` survive.
+ *  - ALL CAPS -> real, because `HTTPS` and `SMTP` have no vowels either.
+ * What is left is a single lowercase blurt with no vowel in it.
+ */
+export function looksLikeMash(text: string): boolean {
+  const t = text.trim();
+  if (!t || /\s/.test(t)) { return false; }
+  if (t.length < 5 || t.length > 24) { return false; }
+  if (t === t.toUpperCase() && /[A-Z]/.test(t)) { return false; }
+  const letters = t.replace(/[^A-Za-z]/g, '');
+  if (letters.length < 5) { return false; }
+  return !/[aeiouy]/i.test(letters);
 }
 
 /**
@@ -281,6 +378,12 @@ export type QuestionRequest = {
   task: string;
   store: string;
   cwd: string;
+  /**
+   * What the user JUST wrote, when this is the follow-up rather than the
+   * opening question. Its presence swaps the whole framing: the suggestion
+   * goes deeper on their note instead of prompting about something adjacent.
+   */
+  note?: string;
   timeoutMs?: number;
   binary?: string;
   env?: NodeJS.ProcessEnv;
@@ -289,10 +392,14 @@ export type QuestionRequest = {
 /** Task + context file in, one offer out. Never throws. */
 export async function generateQuestion(req: QuestionRequest): Promise<Ask> {
   if (!req.task.trim()) { return { kind: 'silent' }; }
+  const note = (req.note || '').trim();
+  // Obvious keyboard mash is not worth a model call OR a reply. Conservative
+  // by design: anything ambiguous goes through as a real note.
+  if (note && looksLikeMash(note)) { return { kind: 'silent' }; }
   const { opening, ending } = nextPhrasing();
   const r = await runClaude({
-    systemPrompt: buildSystemPrompt(opening, ending),
-    userPrompt: buildUserPrompt(req.task, req.store),
+    systemPrompt: buildSystemPrompt(opening, ending, note ? 'note' : 'task'),
+    userPrompt: buildUserPrompt(req.task, req.store, note),
     cwd: req.cwd,
     timeoutMs: req.timeoutMs,
     binary: req.binary,

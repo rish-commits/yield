@@ -69,6 +69,43 @@ export function probeSequence(
   return order.slice(0, limit);
 }
 
+/**
+ * Does `cwd` sit at or under `root`? This is the whole of the route-by-cwd
+ * rule, kept here beside projectPort because it answers the same question:
+ * which project is this hook talking about.
+ *
+ * WINDOWS IS NOT A BYTE COMPARE. VS Code's `Uri.fsPath` normalises the drive
+ * letter to lower-case (documented in @types/vscode), while the cwd in a hook
+ * payload comes raw from the agent's `process.cwd()`, which does not. So
+ * `c:\Users\me\proj` and `C:\Users\me\proj` are the same directory and a `===`
+ * rejects every hook the window actually owns. Separators can differ for the
+ * same reason, so they are folded too.
+ *
+ * POSIX STAYS A BYTE COMPARE. Those filesystems are case-SENSITIVE: `/tmp/A`
+ * and `/tmp/a` are genuinely different projects and must keep comparing false.
+ *
+ * The boundary check matters as much as the casing: `/a/project` must not
+ * match `/a/project-two`, which is why the prefix test appends a separator.
+ */
+export function underRoot(
+  cwd: string,
+  root: string,
+  platform: NodeJS.Platform = process.platform
+): boolean {
+  if (!root || !cwd) { return true; }   // nothing to disagree with
+  const win = platform === 'win32';
+  const sep = win ? '\\' : '/';
+  const norm = (p: string) => {
+    let s = win ? p.replace(/\//g, '\\').toLowerCase() : p;
+    // a trailing separator would defeat the boundary check below
+    while (s.length > 1 && s.endsWith(sep)) { s = s.slice(0, -1); }
+    return s;
+  };
+  const c = norm(cwd);
+  const r = norm(root);
+  return c === r || c.startsWith(r + sep);
+}
+
 export function hookUrl(port: number): string {
   return `http://127.0.0.1:${port}/hook`;
 }

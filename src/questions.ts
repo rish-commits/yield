@@ -86,19 +86,23 @@ export function pickAsks(prompt: string, max = 2): Ask[] {
 }
 
 // ---------------------------------------------------------- the reply model
-// Handoff §5: [honest ack, keyword-echoed if possible] + [soft optional door].
+// Handoff §5 was [honest ack, keyword-echoed if possible] + [soft optional
+// door]. THE DOOR IS GONE as of v1.8.0, and this is a deliberate deviation
+// from the handoff rather than an omission.
+//
+// The door existed because the ack was the only thing said after a note, and
+// ending on a dead "Saved." left nowhere to go. Now the model's follow-up
+// arrives right behind it and does the inviting — specifically, about what
+// they just wrote. Keeping both meant two invitations back to back, and the
+// door was the weaker one: "Add anything else, or you're set" says nothing,
+// while "or anything else that's useful" is attached to a real suggestion.
+// The vaguer line was landing first.
+//
+// After obvious mash the ack is now all there is, and a bare "Added." is the
+// honest length of reply for nonsense.
 
 /** A — honest, never fakes understanding. Rotates so it doesn't feel canned. */
 const ACKS = ['Saved.', 'Got it.', 'Noted.', 'Added.'];
-
-/** C — the soft door. An optional invitation, never a forced question, never
- *  a dead end. Rotates too. */
-const DOORS = [
-  'Add anything else, or you’re set.',
-  'Anything more? Otherwise you’re good.',
-  'Keep going, or leave it there.',
-  'That’s in. Add more whenever.'
-];
 
 /** B — reflect a term that is ACTUALLY in the user's text. Never fabricates
  *  comprehension: no match means we fall back to A rather than guess. */
@@ -117,7 +121,6 @@ const ECHOES: { re: RegExp; term: string }[] = [
 ];
 
 let ackStep = 0;
-let doorStep = 0;
 
 /**
  * The whole reply, in one place. Level 2a replaces the body of this function
@@ -142,6 +145,5 @@ export function buildReply(text: string, answeringId?: string): string {
     ack = echo ? `Noted ${echo.term}.` : ACKS[ackStep++ % ACKS.length];
   }
 
-  const door = DOORS[doorStep++ % DOORS.length];
-  return `${ack} ${door}`;
+  return ack;
 }

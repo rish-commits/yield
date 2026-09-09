@@ -160,8 +160,11 @@ export async function findClaude(
   home: string = os.homedir(),
   platform: NodeJS.Platform = process.platform
 ): Promise<string | undefined> {
+  // .exe FIRST on Windows: it is the one form CreateProcess can launch
+  // directly, so preferring it means the model call needs no cmd.exe at all
+  // (see launchSpec in ask.ts). The shims still count as evidence.
   const names = platform === 'win32'
-    ? ['claude.cmd', 'claude.exe', 'claude.bat']
+    ? ['claude.exe', 'claude.cmd', 'claude.bat']
     : ['claude'];
   const dirs = (env.PATH || env.Path || '').split(platform === 'win32' ? ';' : ':');
   // the npm-global and official installer locations, which are not always on

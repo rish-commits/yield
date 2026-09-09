@@ -103,8 +103,12 @@ body{
 .centre{display:flex;flex-direction:column;align-items:center;text-align:center;padding:var(--s2) 0 0;margin-top:auto;margin-bottom:auto}
 /* ACTIVE STATE: once messages exist the welcome stops floating; all the slack
    collects above it so the stack anchors to the bottom and rises out of the
-   composer. `chatting` is set by the webview the moment the stream wakes. */
-.card.chatting .centre{margin-bottom:0}
+   composer. `chatting` is set by the webview the moment the stream wakes.
+   The bottom margin is a SECTION BREAK, not slack: without it the header only
+   gets .inner's 8px flex gap — the same gap that separates two messages — so
+   the branding read as the first line of the conversation rather than as the
+   thing the conversation starts under. */
+.card.chatting .centre{margin-bottom:var(--s8)}
 .markwrap{position:relative;width:52px;height:52px;border-radius:13px;overflow:hidden;box-shadow:0 4px 14px rgba(10,13,18,.28)}
 .markwrap .mark{width:52px;height:52px;border-radius:13px;display:block}
 .markwrap::after{content:"";position:absolute;top:-60%;left:-30%;width:40%;height:220%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);transform:rotate(18deg);pointer-events:none;animation:marksheen 6s ease-in-out infinite}

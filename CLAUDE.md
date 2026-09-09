@@ -706,6 +706,74 @@ Nothing is asked, nothing is announced, no confirmation dialog.
   no binary present.
 - Verified by `scratchpad/settings-ignore.js` (30/30).
 
+## Cross-platform correctness (v1.7.0)
+Everything below was found by auditing before the first public release. macOS
+and Linux were already fine; Windows was where the exposure was, and none of it
+is provable here — the logic is tested with injected platform values, the
+syscalls are not.
+- **`underRoot()` in `src/ports.ts` owns the route-by-cwd comparison**, not
+  `isOurs`. It lives there because it is platform-sensitive and worth testing
+  without a `vscode` stub.
+- **WINDOWS IS NOT A BYTE COMPARE.** `Uri.fsPath` normalises the drive letter to
+  lower-case (documented in `@types/vscode`), while the hook's cwd arrives raw
+  from the agent's `process.cwd()` and does not. `c:\...` vs `C:\...` made
+  `isOurs` false for EVERY hook the window owned: chip stuck on Idle,
+  `lastPrompt` never set so generation died at `mayGenerate`, `hookEverFired`
+  never flipped so the restart line never retired. Injection and capture still
+  worked, so it looked healthy and was completely deaf.
+- **POSIX STAYS CASE-SENSITIVE.** `/tmp/A` and `/tmp/a` are different projects.
+  A normalisation that made everything match would be worse than the bug, and
+  the foreign-project rejection is load-bearing for the loop guard.
+- **`launchSpec()` in `src/ask.ts` decides how the CLI is launched.**
+  CreateProcess cannot execute a `.cmd`, and the npm install on Windows IS
+  `claude.cmd` — that is why the bare `spawn('claude')` ENOENTed there and smart
+  suggestions fell back silently forever.
+- **NOT `shell: true`.** The prompt is raw user text plus the whole context
+  file, so a shell would make one `&` in a note a command. A `.cmd`/`.bat` goes
+  through `cmd.exe /d /s /c` with every argument escaped for BOTH
+  CommandLineToArgvW and cmd.exe, passed `windowsVerbatimArguments`. `.exe` and
+  every POSIX binary spawn directly, unchanged.
+- **`findClaude()` probes `claude.exe` FIRST** so the common Windows case needs
+  no cmd.exe at all.
+- **`findClaude()` can return a DIRECTORY** (`~/.claude`, accepted as evidence).
+  `usableBinary()` stats it and drops anything that is not an executable file;
+  undefined falls back to the bare name, i.e. exactly v1 behaviour.
+- **`YIELD_CLAUDE_BIN` OUTRANKS the detected path.** Passing the detected
+  binary first silently broke the documented user override — caught by
+  llm-gating going 49/64.
+
+## The follow-up answers the note (v1.8.0)
+- **The note is the PRIMARY input**, not the task. `QuestionRequest.note`
+  switches `buildSystemPrompt` to a note framing ("GO DEEPER ON WHAT THEY JUST
+  WROTE… do NOT change the subject") and `buildUserPrompt` appends it LAST under
+  `RESPOND TO THIS`. Putting it above the task made the model answer the task.
+- **Only the framing differs between modes.** The three-part shape, the 16-word
+  limit, the no-parentheses and one-hedge rules are shared — asserted in the
+  suite, because a second voice would show.
+- **THE SOFT DOOR IS GONE from `buildReply`** — a deliberate deviation from
+  handoff §5, see the comment there. Message 2 does the inviting now, and
+  keeping both put the vaguer invitation first.
+- **`looksLikeMash()` gates before the spawn.** DELIBERATELY TOO CAUTIOUS: any
+  whitespace, under 5 chars, `y` as a vowel, ALL CAPS — every rule is a reason
+  to say no, because a wrong verdict silences a real note while a wrong
+  suggestion costs nothing. It catches 11 of 18 real mash samples and zero real
+  notes; the ones it lets through contain a vowel, by design.
+- **`followUp()` now LOGS why it stayed quiet.** It used to return silently on
+  `!mayGenerate()`, which made three of the four causes invisible in the Output
+  channel and cost a whole diagnosis round.
+
+### CANDIDATE FOR REVISITING — the per-round cap is tuned for short waits
+NOT a bug and NOT changed. `MAX_SUGGESTIONS_PER_ROUND = 2` resets only on
+`UserPromptSubmit`, so on a long turn — minutes, several notes written into one
+wait — the third note onward gets the bare ack and nothing else. That is what
+sent us looking for a broken follow-up when nothing was broken.
+
+The original rule was "never a CHAIN", meaning never talk at someone who is not
+answering. A suggestion following each note the USER initiated is not a chain in
+that sense: they spoke first every time. Worth revisiting whether the budget
+should be per-note-with-engagement rather than per-wait. Left alone for now
+because the back-off it belongs to is what stops the panel being needy.
+
 ## Constraints
 - No paid services. Everything runs locally and free. If model calls are needed
   later (Phase 5), use free tiers only (Gemini free / OpenRouter free).

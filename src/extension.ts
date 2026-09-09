@@ -5,7 +5,7 @@ import * as path from 'path';
 import { pickAsks, buildReply } from './questions';
 import { makeQuestionGate } from './gate';
 import { checkVoiceSupport, transcribe, modelIsCached, VoiceSupport, VOICE_ENABLED } from './whisper';
-import { projectPort, probeSequence, inBand, configuredPorts, PROBE_LIMIT } from './ports';
+import { projectPort, probeSequence, inBand, configuredPorts, underRoot, PROBE_LIMIT } from './ports';
 import { STORE_HEADER, addNote, countNotes, isLegacyFormat } from './store';
 import { isOwnCall, neutralCwd, generateQuestion, Ask } from './ask';
 import { ensureHooks, findClaude, settingsPath, SETUP_COPY, SetupState } from './hooks';
@@ -78,6 +78,35 @@ const MAX_SUGGESTIONS_PER_ROUND = 2;
 // asked, nothing is announced. The ONLY thing the panel ever says is the one
 // line for a state the user actually has to act on.
 let setupState: SetupState = 'ok';
+
+/**
+ * The Claude Code executable findClaude() located, once it has been proven to
+ * be one. Passed to the model call so a CLI that is not on the extension
+ * host's inherited PATH is still reachable — the `~/.local/bin` case on Linux,
+ * and every Windows install, where the name is claude.exe/.cmd rather than
+ * `claude`. undefined means "fall back to the bare name", which is exactly
+ * what v1 did, so a working setup cannot be made worse by this.
+ */
+let claudeBin: string | undefined;
+
+/**
+ * findClaude() is deliberately generous: it accepts `~/.claude` — a DIRECTORY
+ * — as evidence Claude Code exists, which is right for deciding whether to
+ * install hooks and wrong for spawning. Anything that is not a real executable
+ * file is dropped here rather than handed to spawn.
+ */
+async function usableBinary(p: string | undefined): Promise<string | undefined> {
+  if (!p) { return undefined; }
+  try {
+    const st = await fs.stat(p);
+    if (!st.isFile()) { return undefined; }   // ~/.claude, the directory
+    // Windows has no execute bit; the extension is the permission check there.
+    if (process.platform !== 'win32') { await fs.access(p, fs.constants.X_OK); }
+    return p;
+  } catch {
+    return undefined;
+  }
+}
 /** Has any hook reached us since activation? The restart line exists only for
  *  someone whose Claude Code was already running when the hooks appeared, and
  *  the first hook proves that is no longer true. */
@@ -309,7 +338,7 @@ async function startQuestionGeneration() {
   render();
 
   const store = await readStore();
-  const ask = await generateQuestion({ task: lastPrompt, store, cwd: neutralDir });
+  const ask = await generateQuestion({ task: lastPrompt, store, cwd: neutralDir, binary: claudeBin });
 
   // A newer task started while we were generating; that result is stale.
   if (!cachedAsk || cachedAsk.key !== key) {
@@ -372,7 +401,7 @@ async function saveNote(raw: string, answeringId?: string) {
 
     // Moment B. The ack above is instant and scripted; this arrives after it,
     // so the model's latency is covered by something already on screen.
-    void followUp();
+    void followUp(text);
   } catch (err) {
     note(`save FAILED: ${(err as Error).message}`);
     panel?.webview.postMessage({ type: 'saveFailed' });
@@ -384,16 +413,25 @@ async function saveNote(raw: string, answeringId?: string) {
  * engagement, so the gate allows it — but the per-round cap stops us talking at
  * someone who is writing several notes in one wait.
  */
-async function followUp() {
+async function followUp(text: string) {
   if (suggestionsThisRound >= MAX_SUGGESTIONS_PER_ROUND) {
     note('no follow-up: already suggested twice this wait');
     return;
   }
-  if (!mayGenerate()) { return; }
+  if (!mayGenerate()) {
+    // Previously a silent return, which made this exact case undiagnosable from
+    // the Output channel: the follow-up simply never appeared and said nothing.
+    note(`no follow-up: ${!smartSuggestions() ? 'smart suggestions are off'
+      : !panel ? 'panel closed' : gate.muted ? 'questions muted' : 'no task yet'}`);
+    return;
+  }
   suggestionsThisRound++;
 
   const store = await readStore();
-  const ask = await generateQuestion({ task: lastPrompt, store, cwd: neutralDir });
+  // The NOTE is the primary input here, not the task: the follow-up should read
+  // as a response to what they just wrote, not a fresh prompt about something
+  // adjacent. generateQuestion falls back to task-framing when it is absent.
+  const ask = await generateQuestion({ task: lastPrompt, store, note: text, cwd: neutralDir, binary: claudeBin });
   if (ask.kind === 'question') {
     note(`suggestion: ${ask.text}`);
     panel?.webview.postMessage({ type: 'suggest', text: ask.text });
@@ -646,11 +684,14 @@ function makeServer(port: number): http.Server {
   });
 }
 
-/** Whether a hook's cwd belongs to the project this window has open. */
+/**
+ * Whether a hook's cwd belongs to the project this window has open. The
+ * comparison itself lives in ports.ts (underRoot) because it is platform
+ * -sensitive and worth testing without a vscode stub.
+ */
 function isOurs(cwd: string): boolean {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!root || !cwd) { return true; }   // nothing to disagree with
-  return cwd === root || cwd.startsWith(`${root}${path.sep}`);
+  return underRoot(cwd, root ?? '');
 }
 
 /**
@@ -755,6 +796,11 @@ async function runSetup(announce = false) {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const claudePath = await findClaude();
   const result = await ensureHooks(root, primaryPort, { claudePath });
+
+  claudeBin = await usableBinary(claudePath);
+  note(claudeBin
+    ? `claude binary: ${claudeBin}`
+    : `claude binary: not resolved to an executable${claudePath ? ` (${claudePath})` : ''} — the model call will try the bare name`);
 
   setupState = result.state;
   if (result.path) { note(`Claude Code settings: ${result.path}`); }
