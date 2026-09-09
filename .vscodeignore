@@ -14,3 +14,4 @@ bin/whisper/**
 .gitignore
 .gitattributes
 .git/**
+test/**

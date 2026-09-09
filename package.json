@@ -62,7 +62,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "vscode:prepublish": "npm run compile",
-    "stage:whisper": "node scripts/stage-whisper.js"
+    "stage:whisper": "node scripts/stage-whisper.js",
+    "test": "node test/run-all.js"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

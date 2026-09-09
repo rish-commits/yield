@@ -98,7 +98,7 @@ Trigger seam (Phase 2) — confirmed live end to end.
   The old content was bookkeeping; nothing the user wrote is ever destroyed.
 - The one byte we add to what was typed: a multi-line note keeps its newlines
   but indents continuations two spaces so it stays one bullet.
-- Verified by `scratchpad/store-format.js` (45/45) against the compiled build.
+- Verified by `test/store-format.js` (45/45) against the compiled build.
 
 ## Phase 3 design — the memory store
 - Yield owns its OWN file: `.yield/yield-context.md` in the project. It NEVER reads
@@ -281,7 +281,7 @@ scrollable column holding the header and every message.
   exactly that.
 
 ### Testing the stack needs a real browser, and virtual time lies twice
-`scratchpad/stack-behaviour.js` drives real Chrome against the shipped files.
+`test/stack-behaviour.js` drives real Chrome against the shipped files.
 Two harness artifacts cost real time and are worth knowing:
 - **No scroll animation advances under `--virtual-time-budget`** — and because
   `scroll-behavior:smooth` animates even a direct `scrollTop` assignment, every
@@ -336,7 +336,7 @@ wanted, not a runtime dependency in a zero-dependency project.
 - Headless Chrome with `--virtual-time-budget` FREEZES CSS animations that
   start after load: `msgin` sat at `currentTime=0`, so every message rendered
   at `opacity:0` and the panel looked broken. It is a harness artifact, not a
-  bug. Verify motion over CDP on the real clock (`scratchpad/shot.js`) before
+  bug. Verify motion over CDP on the real clock (`test/shot.js`) before
   believing a blank frame.
 - Pin AFTER the message has its text. `pin()` reads `scrollHeight`, so pinning
   before setting `textContent` scrolls to a stale height and the newest message
@@ -385,7 +385,7 @@ wired.
   the scrollback) and an unused `PLACEHOLDER` const.
 
 ### How the lifecycle is verified
-`scratchpad/chip-lifecycle.js` and `scratchpad/firstframe.js` drive
+`test/chip-lifecycle.js` and `test/firstframe.js` drive
 `out/extension.js` — the actual compiled build — with `vscode` and `http`
 stubbed, feeding the real hook handler real payloads. They assert the chip
 sequence across two consecutive runs, that the injection rides the same
@@ -457,7 +457,7 @@ capability extension.ts reports, so `runTranscription` refuses and no host-side
 voice work runs, (b) the `no-voice` class painted onto the card, which hides the
 mic from the first frame and rebalances the composer's right padding for one
 button, and (c) the webview removing the mic node outright. v1.1 flips one
-boolean. `scratchpad/flag-roundtrip.js` PROVES that: it flips the flag,
+boolean. `test/flag-roundtrip.js` PROVES that: it flips the flag,
 recompiles, and re-runs the full stage 2 + stage 3 suites (18/18 + 55/55) before
 restoring.
 
@@ -488,7 +488,8 @@ states ONLY; v77 remains authoritative for everything else.
   lines. nodejs-whisper only reaches for ffmpeg when the input needs resampling,
   so handing it a file that is already 16 kHz means that path is never taken.
 - **The 0.5s lead silence is load-bearing.** whisper drops the first word when a
-  clip starts abruptly on speech — proven both ways on `scratchpad/audio/known.wav`
+  clip starts abruptly on speech — proven both ways on `known.wav` (an audio
+  fixture, not committed; see `YIELD_TEST_FIXTURES` in test/README.md)
   ("quick brown fox…" unpadded, "The quick brown fox…" padded). Done in the
   BUFFER, not by starting the recorder early, which would depend on user timing.
 - **One MediaStream, one permission, ONE AudioContext.** The AnalyserNode hangs
@@ -501,7 +502,7 @@ states ONLY; v77 remains authoritative for everything else.
   left:0, no fixed height) and the wave uses `align-self:stretch`. v78's original
   `inset:0` plus `height:64px` pinned them to the top and only looked centred
   because the composer happened to be exactly 64px. Measured centred at 66px and
-  86px by `scratchpad/layout-check.js`, which drives real Chrome.
+  86px by `test/layout-check.js`, which drives real Chrome.
 - **Light is the chosen surface** (`--muted` ground, `--border` at unchanged
   weight, `--fg` bars, stop button at the send button's exact weights). The dark
   variant exists only in the v78 mock for comparison and is deliberately NOT
@@ -517,9 +518,9 @@ states ONLY; v77 remains authoritative for everything else.
 - **The transcript is a draft, never a save.** It appends to the composer (a
   half-typed note survives), and saving stays the user's deliberate act.
   Failures RETAIN the audio so Retry re-runs it without re-recording.
-- Verified by `scratchpad/voice-pipeline.js` (18/18), `scratchpad/voice-states.js`
-  (55/55), `scratchpad/voice-off.js` (29/29, the shipped config) and
-  `scratchpad/layout-check.js` (18/18, real Chrome geometry) — all against the
+- Verified by `test/voice-pipeline.js` (18/18), `test/voice-states.js`
+  (55/55), `test/voice-off.js` (29/29, the shipped config) and
+  `test/layout-check.js` (18/18, real Chrome geometry) — all against the
   compiled build.
 - **The dead mic click was a real defect**, now fixed: reaching straight for
   `navigator.mediaDevices.getUserMedia` throws a TypeError SYNCHRONOUSLY when
@@ -590,11 +591,11 @@ line. There is ONE retry loop left in the extension and it counts:
 - **`retargetHooks()` rewrites only Yield's own 127.0.0.1 `/hook` entries**,
   preserving indentation, unrelated settings, command hooks and foreign http
   hooks. Hooks snapshot at session start, so a rewrite says RESTART CLAUDE CODE.
-- Verified by `scratchpad/port-claim.js` (32/32) on REAL sockets — two colliding
+- Verified by `test/port-claim.js` (32/32) on REAL sockets — two colliding
   projects both listening and both reacting to their own prompts, the
   settings==bound invariant, port memory across relaunch, probing past a
   squatter, and the all-ports-taken terminal state with notes still saving.
-  `scratchpad/listener.js` (20/20) keeps the routing and retarget coverage; its
+  `test/listener.js` (20/20) keeps the routing and retarget coverage; its
   wait-for-the-holder sections are gone with the behaviour they tested.
 - **A stub server must set `.listening`.** `isListening()` reads it the way a
   real `http.Server` does, and two harnesses that never set it read as deaf and
@@ -613,7 +614,7 @@ sees a credential. Acknowledgments stay SCRIPTED and instant.
   rejection, and the SENTINEL in the prompt. `--settings` pointing at an empty
   file does NOT work — project hooks still load. Proven from the REAL extension
   host's environment, and with a temporary global hook installed, by
-  `scratchpad/loop-guard.js` (18/18).
+  `test/loop-guard.js` (18/18).
 - **`MAX_THINKING_TOKENS=0` is the single biggest win**: without it haiku emits
   ~2,000 thinking tokens for a one-line answer and the call takes 19-43s. With
   it, ~30 tokens and ~2.9s.
@@ -646,8 +647,8 @@ sees a credential. Acknowledgments stay SCRIPTED and instant.
 - **No parentheses, no listed examples** — 9 of 10 reached for "(A, B, C)"
   otherwise, which is exactly what a nowrap row ellipsizes away.
 - Cost ~13,600 tokens and ~$0.007 per call; a 50-note file adds only ~800.
-- Verified by `scratchpad/llm-gating.js` (42/42, stubbed CLI) and
-  `scratchpad/llm-tone.js` (real model, raw output for reading).
+- Verified by `test/llm-gating.js` (42/42, stubbed CLI) and
+  `test/llm-tone.js` (real model, raw output for reading).
 
 ## Self-installing hooks (v1.4.0) — `src/hooks.ts`
 Yield is useless without its hooks, so installing the extension IS the setup.
@@ -682,7 +683,7 @@ Nothing is asked, nothing is announced, no confirmation dialog.
 - **`render()` now no-ops until the webview says `ready`.** Setup finishes
   asynchronously and would otherwise push into a still-loading panel. Phase E's
   rule is structural now rather than incidental.
-- Verified by `scratchpad/setup.js` (53/53), including the panel line appearing
+- Verified by `test/setup.js` (53/53), including the panel line appearing
   and disappearing through the compiled build.
 
 ## Public-release settings (v1.5.0)
@@ -704,7 +705,7 @@ Nothing is asked, nothing is announced, no confirmation dialog.
   .vscodeignore). It stays in the repo behind VOICE_ENABLED. Packaged size went
   1.40 MB -> 150 KB. The packaged extension was verified to activate cleanly with
   no binary present.
-- Verified by `scratchpad/settings-ignore.js` (30/30).
+- Verified by `test/settings-ignore.js` (30/30).
 
 ## Cross-platform correctness (v1.7.0)
 Everything below was found by auditing before the first public release. macOS
@@ -773,6 +774,24 @@ answering. A suggestion following each note the USER initiated is not a chain in
 that sense: they spoke first every time. Worth revisiting whether the budget
 should be per-note-with-engagement rather than per-wait. Left alone for now
 because the back-off it belongs to is what stops the panel being needy.
+
+## The suites live in `test/`, and they are the verification story
+Moved out of `scratchpad/` before the first public release: they were gitignored
+along with it, so 13 suites and ~470 checks existed on ONE machine and a clone
+had no way to verify anything.
+- **`npm test`** runs the 13 that need only Node (plus Chrome for two). They
+  drive the COMPILED build in `out/`, so `npm run compile` first.
+- **Nothing is machine-specific any more.** `ROOT` is `path.resolve(__dirname,
+  '..')`, Chrome is discovered from the usual macOS and Linux locations or
+  `YIELD_TEST_CHROME`, and temp files go to the OS temp directory instead of
+  into the repo.
+- **`test/**` is in .vscodeignore**, so none of it ships in the VSIX.
+- **`scratchpad/` stays gitignored** for genuine scratch work, and still holds
+  the audio fixtures, which are real recordings of someone's voice and are
+  deliberately not committed. `YIELD_TEST_FIXTURES` points the voice suites at
+  them.
+- **`llm-tone.js` and the voice suites are opt-in** (`--tone`, `--voice`): one
+  spends real money, the others need `VOICE_ENABLED=true` and those fixtures.
 
 ## Constraints
 - No paid services. Everything runs locally and free. If model calls are needed
