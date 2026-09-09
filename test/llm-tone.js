@@ -65,7 +65,7 @@ const HEDGES = ['if useful','if it matters','if relevant','might want','maybe','
   console.log(`  keeps the door open        ${qs.filter((t) => A.ENDINGS.some((e) => t.toLowerCase().includes(e.toLowerCase()))).length}/${qs.length}`);
   console.log(`  NO parentheses             ${qs.filter((t) => !/[()]/.test(t)).length}/${qs.length}`);
   console.log(`  <=1 hedge                  ${qs.filter((t) => HEDGES.filter((h) => t.toLowerCase().includes(h)).length <= 1).length}/${qs.length}`);
-  console.log(`  within 10-16 words         ${words.filter((w) => w >= 10 && w <= 16).length}/${qs.length}   range ${words[0]}-${words[words.length - 1]}`);
+  console.log(`  within 10-15 words         ${words.filter((w) => w >= 10 && w <= 15).length}/${qs.length}   range ${words[0]}-${words[words.length - 1]}`);
   console.log(`  distinct openings used     ${opens.size}  ${[...opens].join(' | ')}`);
   console.log(`  distinct endings used      ${ends.size}  ${[...ends].join(' | ')}`);
 })();

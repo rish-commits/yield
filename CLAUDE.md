@@ -644,6 +644,19 @@ sees a credential. Acknowledgments stay SCRIPTED and instant.
   ("Might be worth noting") invite a `that…` clause, which turns an offer into a
   statement and blew the budget to 15-24 words. Forcing OPENING + short noun
   phrase + ENDING gave 10/10 within 10-16 words, range 11-15.
+- **The budget is 15 words (v1.10.1), tightened from 16.** At 16 the model had
+  room to list two things and the joint showed — "what problems it solves or
+  who it's for, or whatever else is useful" reads as a stumble because the line
+  now carries two ORs. The constraint is what forces it to pick ONE gap.
+  Specificity did not suffer: measured against the same eight notes, 15 gave
+  "how environment variables differ between preview and production" where 16
+  gave "how environment variables are configured".
+- **PART 3 IS EXPLICITLY NON-OPTIONAL, and the tighter budget is why.** Dropping
+  the closing ending is the easiest corner to cut when trimming to fit, and it
+  did: 2 of 56 lines at 15 words came back with no ending at all, versus 0 of 24
+  at 16. One line in the system prompt saying it must be there verbatim even
+  when trimming fixed it — 0 of 30 since. Re-check this if the budget ever moves
+  again; it is the failure mode a word cap produces.
 - **No parentheses, no listed examples** — 9 of 10 reached for "(A, B, C)"
   otherwise, which is exactly what a nowrap row ellipsizes away.
 - Cost ~13,600 tokens and ~$0.007 per call; a 50-note file adds only ~800.
@@ -804,7 +817,7 @@ and the circumstances were not.
 - **Neither a task nor a note is still `silent`.** No generic fallback line was
   added: with nothing specific to say, silence stays correct.
 - **The tone survives without a task.** Eight real notes through no-task mode
-  came back 12-16 words, no parentheses, no question marks, every one naming a
+  came back 12-15 words, no parentheses, no question marks, every one naming a
   specific gap — sessions, generated code, env vars, schema versioning, tab
   width. A vague suggestion would be worse than the dead zone; it was checked
   before committing, not assumed.

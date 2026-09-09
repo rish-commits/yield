@@ -133,7 +133,7 @@ const openPanel = async () => { await vscodeStub._cmds['yield.open'](); onMsg({ 
   check('the chosen opening is in the prompt', sys.includes('Worth mentioning'), true);
   check('the chosen ending is in the prompt', sys.includes('or something else entirely'), true);
   check('parentheses are banned', /No parentheses/.test(sys), true);
-  check('the word cap is stated as hard', /HARD LIMIT: 16 words/.test(sys), true);
+  check('the word cap is stated as hard', /HARD LIMIT: 15 words/.test(sys), true);
   check('NONE is offered as a first-class outcome', /output exactly NONE/.test(sys), true);
 
   console.log('\n=== 1. gating: no call is made when it could not be shown ===');
@@ -314,7 +314,7 @@ const openPanel = async () => { await vscodeStub._cmds['yield.open'](); onMsg({ 
   check('note mode tells it to go deeper', /GO DEEPER ON WHAT THEY JUST WROTE/.test(sysNote), true);
   check('task mode does not', /GO DEEPER/.test(sysTask), false);
   check('task mode is the default', ASK.buildSystemPrompt('Could add', 'or anything else'), sysTask);
-  for (const shared of ['THE LINE HAS EXACTLY THREE PARTS', 'HARD LIMIT: 16 words',
+  for (const shared of ['THE LINE HAS EXACTLY THREE PARTS', 'HARD LIMIT: 15 words',
     'No parentheses', 'At most ONE hedge']) {
     check(`tone rule is shared by both modes: ${shared.slice(0, 28)}`,
       sysNote.includes(shared) && sysTask.includes(shared), true);
