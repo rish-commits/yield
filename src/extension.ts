@@ -69,9 +69,23 @@ let cachedAsk: { key: string; ask: Ask | undefined } | undefined;
 /** Length of the store when the count was last read — part of the cache key, so
  *  a hand-edit to the file invalidates a question that may now be answered. */
 let storeLen = 0;
-/** Follow-ups already offered during this wait. Never a chain of 3+. */
-let suggestionsThisRound = 0;
-const MAX_SUGGESTIONS_PER_ROUND = 2;
+/**
+ * THE FOLLOW-UP BUDGET IS PER NOTE, NOT PER WAIT (v1.9.0).
+ *
+ * It used to be two per wait, reset only on UserPromptSubmit. That is right for
+ * a thirty-second wait and wrong for a real one: on a turn that runs for
+ * minutes, someone writing a dozen notes got a reply to the first two and
+ * silence for the rest, which reads as broken rather than as restraint.
+ *
+ * The rule it belonged to is "never a CHAIN" — never talk at someone who is not
+ * answering. A reply to a note the USER chose to write is not a chain: they
+ * spoke first, every time. What that rule actually protects is still enforced,
+ * in two places that did not change: gate.muted (mayGenerate refuses outright
+ * once the room has gone quiet) and the one-per-note guard below, so Yield can
+ * never say two things about the same note.
+ */
+let noteSeq = 0;
+let followedUpFor = -1;
 
 // ── setup ──────────────────────────────────────────────────────────────────
 // Installing the extension is the consent and the whole setup. Nothing is
@@ -372,6 +386,7 @@ async function writeAtomic(file: string, contents: string) {
 async function saveNote(raw: string, answeringId?: string) {
   const text = raw.trim();
   if (!text) { return; } // empty save is a no-op (state model §06)
+  const seq = ++noteSeq;   // identifies THIS note, so its follow-up is one-shot
 
   const file = storePath();
   if (!file) {
@@ -401,7 +416,7 @@ async function saveNote(raw: string, answeringId?: string) {
 
     // Moment B. The ack above is instant and scripted; this arrives after it,
     // so the model's latency is covered by something already on screen.
-    void followUp(text);
+    void followUp(text, seq);
   } catch (err) {
     note(`save FAILED: ${(err as Error).message}`);
     panel?.webview.postMessage({ type: 'saveFailed' });
@@ -413,9 +428,12 @@ async function saveNote(raw: string, answeringId?: string) {
  * engagement, so the gate allows it — but the per-round cap stops us talking at
  * someone who is writing several notes in one wait.
  */
-async function followUp(text: string) {
-  if (suggestionsThisRound >= MAX_SUGGESTIONS_PER_ROUND) {
-    note('no follow-up: already suggested twice this wait');
+async function followUp(text: string, seq: number) {
+  // One note, one follow-up. saveNote calls this exactly once per save, so this
+  // is belt and braces — but it is the invariant the removed per-wait cap used
+  // to provide accidentally, and it is worth being explicit rather than lucky.
+  if (followedUpFor === seq) {
+    note('no follow-up: already suggested for this note');
     return;
   }
   if (!mayGenerate()) {
@@ -425,7 +443,7 @@ async function followUp(text: string) {
       : !panel ? 'panel closed' : gate.muted ? 'questions muted' : 'no task yet'}`);
     return;
   }
-  suggestionsThisRound++;
+  followedUpFor = seq;
 
   const store = await readStore();
   // The NOTE is the primary input here, not the task: the follow-up should read
@@ -922,7 +940,6 @@ function handleEvent(event: string, prompt: string) {
     // A new task invalidates the previous question and reopens the follow-up
     // budget. Generation runs inside a wait that was already happening.
     cachedAsk = undefined;
-    suggestionsThisRound = 0;
     void startQuestionGeneration();
     return;
   }

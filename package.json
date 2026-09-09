@@ -2,7 +2,7 @@
   "name": "yield",
   "displayName": "Yield: Context for Claude Code",
   "description": "Save notes while Claude Code works. They come back as project context on every later run.",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "publisher": "RishabKapuria",
   "license": "MIT",
   "icon": "media/icon.png",

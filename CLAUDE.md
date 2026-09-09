@@ -763,17 +763,39 @@ syscalls are not.
   `!mayGenerate()`, which made three of the four causes invisible in the Output
   channel and cost a whole diagnosis round.
 
-### CANDIDATE FOR REVISITING — the per-round cap is tuned for short waits
-NOT a bug and NOT changed. `MAX_SUGGESTIONS_PER_ROUND = 2` resets only on
-`UserPromptSubmit`, so on a long turn — minutes, several notes written into one
-wait — the third note onward gets the bare ack and nothing else. That is what
-sent us looking for a broken follow-up when nothing was broken.
+### The follow-up budget is PER NOTE (v1.9.0) — the per-wait cap is gone
+`MAX_SUGGESTIONS_PER_ROUND = 2` reset only on `UserPromptSubmit`, which is right
+for a thirty-second wait and wrong for a real one: on a turn running minutes,
+someone writing a dozen notes got a reply to the first two and silence for the
+rest. It read as broken rather than as restraint, and it sent us hunting a bug
+that did not exist — twice.
 
-The original rule was "never a CHAIN", meaning never talk at someone who is not
-answering. A suggestion following each note the USER initiated is not a chain in
-that sense: they spoke first every time. Worth revisiting whether the budget
-should be per-note-with-engagement rather than per-wait. Left alone for now
-because the back-off it belongs to is what stops the panel being needy.
+The rule it belonged to was "never a CHAIN", meaning never talk at someone who
+is not answering. A reply to a note the USER chose to write is not a chain: they
+spoke first, every time.
+
+- **One note, one follow-up.** `noteSeq` identifies each save and
+  `followedUpFor` makes the follow-up one-shot. `saveNote` calls `followUp`
+  exactly once anyway, so the guard is belt and braces — but it is the invariant
+  the removed cap used to provide by accident, and being explicit beats being
+  lucky.
+- **`gate.muted` is untouched and is still checked first in `mayGenerate()`**,
+  so a muted panel spawns nothing at all. Proved through the compiled build:
+  four rounds of total silence mute it, and the note written afterwards costs
+  ZERO model calls and logs why.
+
+#### WHAT THE BACK-OFF DOES NOT COVER — know this before tuning it
+**Saving a note calls `gate.engage()`** (the `note` message handler), exactly as
+gate.ts's own comment intends: *"they clicked a question or saved a note —
+either way, they engaged"*. So a user who writes notes constantly while ignoring
+every suggestion is **never muted** — by that definition they are engaged. The
+gate catches the disengaged user, not the unpersuaded one.
+
+Consequence, and it is deliberate rather than overlooked: for an ACTIVE
+note-writer the only bound on follow-ups is one per note, so spend scales with
+their own typing (~$0.007 a note). Both halves are asserted in
+`test/follow-up-budget.js` (23/23) so the property is visible rather than
+discovered later.
 
 ## The suites live in `test/`, and they are the verification story
 Moved out of `scratchpad/` before the first public release: they were gitignored
