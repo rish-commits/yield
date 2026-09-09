@@ -330,13 +330,26 @@ function smartSuggestions(): boolean {
   return vscode.workspace.getConfiguration('yield').get<boolean>('smartSuggestions', true);
 }
 
-function mayGenerate(): boolean {
+/**
+ * @param haveNote true when a note the user just wrote is the subject. Moment A
+ *   has nothing but the task to key a question off, so it still requires one.
+ *   Moment B does not: the note IS the subject and the task is only supporting
+ *   context, so a note with no task yet is a perfectly answerable thing.
+ *
+ * WHY THAT MATTERS MORE THAN IT LOOKS: a brand new user installs Yield, the
+ * panel opens, and their first move is to type a note — before they have sent
+ * the agent anything. Requiring a task made that the one case that structurally
+ * could not answer, so the product's opening impression was a bare "Saved."
+ * with nothing behind it. Reloading a window to install an update lands in the
+ * same dead zone, which is how this was found.
+ */
+function mayGenerate(haveNote = false): boolean {
   // Checked FIRST, so switching it off means no subprocess is ever spawned —
   // not a call that gets discarded later in the pipeline.
   if (!smartSuggestions()) { return false; }
   if (!panel) { return false; }        // a closed panel cannot show a question
   if (gate.muted) { return false; }    // read the room; they stopped engaging
-  if (!lastPrompt.trim()) { return false; }
+  if (!lastPrompt.trim() && !haveNote) { return false; }
   return true;
 }
 
@@ -436,11 +449,11 @@ async function followUp(text: string, seq: number) {
     note('no follow-up: already suggested for this note');
     return;
   }
-  if (!mayGenerate()) {
+  if (!mayGenerate(true)) {
     // Previously a silent return, which made this exact case undiagnosable from
     // the Output channel: the follow-up simply never appeared and said nothing.
     note(`no follow-up: ${!smartSuggestions() ? 'smart suggestions are off'
-      : !panel ? 'panel closed' : gate.muted ? 'questions muted' : 'no task yet'}`);
+      : !panel ? 'panel closed' : 'questions muted'}`);
     return;
   }
   followedUpFor = seq;

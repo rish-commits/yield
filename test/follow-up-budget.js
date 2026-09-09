@@ -74,6 +74,7 @@ Module._load = function (req) {
 };
 const ext = require(path.join(ROOT, 'out', 'extension.js'));
 const G = require(path.join(ROOT, 'out', 'gate.js'));
+const ASK = require(path.join(ROOT, 'out', 'ask.js'));
 
 function hook(payload) {
   return new Promise((resolve) => {
@@ -95,7 +96,32 @@ const suggested = () => posted.filter((m) => m.type === 'suggest').length;
   onMsg({ type: 'ready' });
   await wait(80);
 
-  console.log('=== 1. MANY notes inside ONE wait — the case that used to go silent ===');
+  // MUST run before any hook: this is the state a brand new user is in.
+  console.log('=== 0. a note with NO task yet — the first thing a new user does ===');
+  resetCalls(); posted.length = 0; logged.length = 0;
+  onMsg({ type: 'note', text: 'we use supabase for auth' });
+  await wait(900);
+  check('a note with no task still gets its follow-up', suggested(), 1);
+  check('and it did spawn the model', callCount(), 1);
+  check('it is NOT refused for having no task',
+    logged.some((l) => /no follow-up: no task yet/.test(l)), false);
+
+  // Moment A is unchanged. It has only the task to key off, so an empty task
+  // with NO note stays silent — relaxing that would be inventing a subject.
+  const taskModeEmpty = await ASK.generateQuestion({ task: '', store: '# ctx', cwd: os.tmpdir() });
+  check('task mode with no task is still silent', taskModeEmpty.kind, 'silent');
+  check('task mode with a task still asks',
+    (await ASK.generateQuestion({ task: 'add a migration', store: '# ctx', cwd: os.tmpdir() })).kind, 'question');
+
+  // Neither a task nor a note is still silence, not a generic line.
+  const neither = await ASK.generateQuestion({ task: '', store: '# ctx', cwd: os.tmpdir() });
+  check('no task AND no note stays silent', neither.kind, 'silent');
+  check('an empty task is labelled for the model, not left blank',
+    /nothing yet/.test(ASK.buildUserPrompt('', '# ctx', 'a note')), true);
+  check('a real task is still passed through verbatim',
+    ASK.buildUserPrompt('refactor auth', '# ctx', 'a note').includes('refactor auth'), true);
+
+  console.log('\n=== 1. MANY notes inside ONE wait — the case that used to go silent ===');
   await hook({ hook_event_name: 'UserPromptSubmit', cwd: WS, prompt: 'refactor the auth middleware' });
   await wait(500);
   resetCalls(); posted.length = 0;

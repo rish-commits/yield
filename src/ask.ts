@@ -326,7 +326,7 @@ export function buildUserPrompt(task: string, store: string, note?: string): str
     '',
     'TASK JUST SENT TO THE AGENT:',
     '"""',
-    task.trim(),
+    task.trim() || '(nothing yet — they have not sent the agent a task)',
     '"""'
   ];
   // LAST and labelled loudest: it is the thing being responded to. Placing it
@@ -391,8 +391,11 @@ export type QuestionRequest = {
 
 /** Task + context file in, one offer out. Never throws. */
 export async function generateQuestion(req: QuestionRequest): Promise<Ask> {
-  if (!req.task.trim()) { return { kind: 'silent' }; }
   const note = (req.note || '').trim();
+  // A task is required only when the task IS the subject. With a note there is
+  // something concrete to answer, so no task is a normal state rather than a
+  // reason to stay quiet — that is the whole after-install dead zone.
+  if (!req.task.trim() && !note) { return { kind: 'silent' }; }
   // Obvious keyboard mash is not worth a model call OR a reply. Conservative
   // by design: anything ambiguous goes through as a real note.
   if (note && looksLikeMash(note)) { return { kind: 'silent' }; }

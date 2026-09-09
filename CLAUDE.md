@@ -784,6 +784,31 @@ spoke first, every time.
   four rounds of total silence mute it, and the note written afterwards costs
   ZERO model calls and logs why.
 
+#### A NOTE WITH NO TASK IS ANSWERABLE (v1.10.0) — the after-install dead zone
+`mayGenerate()` required `lastPrompt`, so a note written before any
+UserPromptSubmit was refused with `no follow-up: no task yet`. That is not an
+edge case, it is the OPENING IMPRESSION: a new user installs Yield, the panel
+opens, and their natural first move is to type a note before they have sent the
+agent anything. Their first ever interaction was a bare "Saved." with nothing
+behind it. Reloading a window to install an update lands in the same dead zone,
+which is how it was found — three diagnoses in a row where the feature was fine
+and the circumstances were not.
+
+- **Scoped to the no-task case ONLY.** `mayGenerate(haveNote)` relaxes the task
+  requirement for Moment B alone. MOMENT A IS UNCHANGED: it has only the task to
+  key a question off, so no task still means no question — relaxing that would
+  be inventing a subject.
+- **The note is still the primary input**, so there is genuinely something to
+  answer. `buildUserPrompt` labels an empty task `(nothing yet — they have not
+  sent the agent a task)` rather than leaving it blank.
+- **Neither a task nor a note is still `silent`.** No generic fallback line was
+  added: with nothing specific to say, silence stays correct.
+- **The tone survives without a task.** Eight real notes through no-task mode
+  came back 12-16 words, no parentheses, no question marks, every one naming a
+  specific gap — sessions, generated code, env vars, schema versioning, tab
+  width. A vague suggestion would be worse than the dead zone; it was checked
+  before committing, not assumed.
+
 #### WHAT THE BACK-OFF DOES NOT COVER — know this before tuning it
 **Saving a note calls `gate.engage()`** (the `note` message handler), exactly as
 gate.ts's own comment intends: *"they clicked a question or saved a note —
