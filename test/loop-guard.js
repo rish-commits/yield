@@ -150,12 +150,18 @@ function spawnBare(cwd, env) {
 (async () => {
   try {
     console.log('=== 0. the environment this spawns with ===');
-    check('the live extension host was found', !!HOST, true);
+    // NOT a failure when there is no host: this suite reads the LIVE extension
+    // host's environment, which a clone or a CI box simply does not have. It is
+    // a precondition, so say so and leave rather than reporting a broken build.
     if (!HOST) {
-      throw new Error(
-        `no extension host is listening on ${livePorts().join(' or ')} — open this project ` +
-        'in the editor with Yield active, then re-run. This suite reads the REAL host env.');
+      console.log(`\nSKIPPED — no extension host is listening on ${livePorts().join(' or ')}.`);
+      console.log('This suite reads the REAL host environment, so open the project in the');
+      console.log('editor with Yield active and re-run it.');
+      restoreGlobal();
+      fs.rmSync(WS, { recursive: true, force: true });
+      process.exit(0);
     }
+    check('the live extension host was found', !!HOST, true);
     report('host pid', HOST.pid);
     report('env entries read from it', Object.keys(HOST.env).length);
     const hostClaudeVars = Object.keys(HOST.env).filter((k) => /^CLAUDE/i.test(k));

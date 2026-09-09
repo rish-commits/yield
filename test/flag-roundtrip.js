@@ -49,8 +49,21 @@ try {
   setFlag(ON);
   const compiled = fs.readFileSync(path.join(ROOT, 'out/whisper.js'), 'utf8');
   console.log(`  compiled build now says VOICE_ENABLED = ${/exports\.VOICE_ENABLED = (true|false)/.exec(compiled)[1]}`);
-  ok = run('voice-pipeline.js') && ok;
-  ok = run('voice-states.js') && ok;
+  // The two voice suites transcribe REAL audio, and those recordings are not in
+  // the repo. Without them the flag round trip is still worth running — the
+  // half that matters, that the flag flips and restores cleanly, needs no
+  // fixture — so skip rather than fail on a clone that has none.
+  const FIXTURES = process.env.YIELD_TEST_FIXTURES
+    || path.join(ROOT, 'scratchpad', 'audio');
+  const haveFixtures = ['known.wav', 'src48.wav']
+    .every((f) => { try { fs.accessSync(path.join(FIXTURES, f)); return true; } catch { return false; } });
+  if (haveFixtures) {
+    ok = run('voice-pipeline.js') && ok;
+    ok = run('voice-states.js') && ok;
+  } else {
+    console.log(`  SKIP  voice-pipeline.js / voice-states.js — no audio fixtures in ${FIXTURES}`);
+    console.log('        set YIELD_TEST_FIXTURES to a directory holding known.wav and src48.wav');
+  }
 } finally {
   // Always restore the shipped state, even if a suite threw.
   fs.writeFileSync(SRC, original);
